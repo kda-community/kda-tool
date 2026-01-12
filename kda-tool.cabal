@@ -57,11 +57,12 @@ library
     , cardano-crypto
     , cassava
     , chainweb-api
-    , connection
+    , tls
+    , crypton-connection
     , containers
     , cryptohash-sha256
     , cryptohash-sha512
-    , cryptonite
+    , crypton
     , data-default
     , directory
     , dlist
@@ -139,11 +140,12 @@ test-suite kda-tool-tests
     , cardano-crypto
     , cassava
     , chainweb-api
-    , connection
+    , tls
+    , crypton-connection
     , containers
     , cryptohash-sha256
     , cryptohash-sha512
-    , cryptonite
+    , crypton
     , data-default
     , directory
     , dlist

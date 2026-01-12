@@ -21,6 +21,7 @@ import           Data.Text.Encoding
 import qualified Data.Vector as V
 import qualified Data.YAML.Aeson as YA
 import           Kadena.SigningTypes
+import qualified Network.TLS as TLS
 import           Network.Connection
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS
@@ -54,7 +55,7 @@ githubFile e ght = do
       tpl = _ght_templateName ght
       mkUrl repo = printf "https://raw.githubusercontent.com/%s/master/%s.ktpl" repo tpl
       go repo = do
-        httpsMgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False) Nothing)
+        httpsMgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False TLS.defaultSupported) Nothing)
         req <- parseRequest (mkUrl repo)
         resp <- httpLbs req httpsMgr
         let tplContents = toS $ responseBody resp
