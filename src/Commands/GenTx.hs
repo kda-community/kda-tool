@@ -50,7 +50,7 @@ genTxCommand e args = do
 
 githubFile :: Env -> GitHubTemplate -> IO (Either String Text)
 githubFile e ght = do
-  let repos = fromMaybe (["kadena-io/txlib"]) $ (fmap (:[]) (_ght_templateRepo ght) <|> _configData_txRepos (_env_configData e))
+  let repos = fromMaybe (["kda-community/txlib"]) $ (fmap (:[]) (_ght_templateRepo ght) <|> _configData_txRepos (_env_configData e))
       tpl = _ght_templateName ght
       mkUrl repo = printf "https://raw.githubusercontent.com/%s/master/%s.ktpl" repo tpl
       go repo = do
