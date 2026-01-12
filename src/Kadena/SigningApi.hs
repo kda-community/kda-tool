@@ -10,7 +10,6 @@ import Data.Aeson
 import Data.Proxy
 import Data.Text (Text)
 import GHC.Generics
-import Pact.Core.Command.SigData
 import Pact.Core.Command.Types
 import Pact.Core.Command.Client
 

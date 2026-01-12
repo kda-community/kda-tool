@@ -7,11 +7,9 @@ module Commands.WalletSign
 
 ------------------------------------------------------------------------------
 import           Control.Error
-import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Trans
 import           Control.Monad.Except
-import           Data.Aeson.Lens
 import           Data.List
 import qualified Data.Set as S
 import           Data.String.Conv
@@ -33,7 +31,6 @@ import           Text.Printf
 import           Types.Encoding
 import           Types.Env
 import           Utils
-import Pact.JSON.Legacy.Value (LegacyValue(_getLegacyValue))
 ------------------------------------------------------------------------------
 
 walletSignCommand :: Env -> WalletSignArgs -> IO ()

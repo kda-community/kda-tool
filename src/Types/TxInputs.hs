@@ -17,7 +17,6 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import           Kadena.SigningTypes ()
 import qualified Pact.JSON.Encode as J
-import           Pact.JSON.Legacy.Value
 import           Pact.Core.Command.RPC
 import           Pact.Core.Command.Client
 import           Pact.Core.Command.Types

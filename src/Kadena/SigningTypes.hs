@@ -206,7 +206,7 @@ compactEncoding = defaultOptions
     }
   where
     -- As long as names are not empty or just underscores this head should be fine:
-    shortener = head . reverse . filter (/= "") . L.splitOn "_"
+    shortener = fromMaybe "" . listToMaybe . reverse . filter (/= "") . L.splitOn "_"
 
 ------------------- ORPHANS -------------------
 -- We're defining these orphans here because Pact moved away from `ToJSON` to
