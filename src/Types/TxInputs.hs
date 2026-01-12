@@ -5,6 +5,8 @@ module Types.TxInputs where
 ------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Error
+import           Data.Coerce
+import qualified Data.Map as M
 import           Data.Aeson as A
 import           Data.Aeson.Key as A
 import           Data.Aeson.Types
@@ -13,13 +15,12 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import           Pact.ApiReq
 import           Kadena.SigningTypes ()
 import qualified Pact.JSON.Encode as J
 import           Pact.JSON.Legacy.Value
-import           Pact.Types.Lang
-import           Pact.Types.RPC
-import           Pact.Types.Verifier
+import           Pact.Core.Command.RPC
+import           Pact.Core.Command.Client
+import           Pact.Core.Command.Types
 ------------------------------------------------------------------------------
 
 data PactTxType = PttExec | PttCont
@@ -41,7 +42,7 @@ instance FromJSON PactTxType where
 
 data ExecInputs = ExecInputs
   { _execInputs_codeOrFile :: Either Text FilePath
-  , _execInputs_dataOrFile :: Either Value FilePath
+  , _execInputs_dataOrFile :: Either PactValue FilePath
   } deriving (Eq,Show)
 
 execInputsPairs :: (Monoid a, KeyValue e a) => ExecInputs -> a
@@ -77,10 +78,10 @@ txInputsToApiReq txi = do
   case _txInputs_payload txi of
     Left c -> pure $ ApiReq
       (Just t)
-      (let PactId pid = _cmPactId c in hush $ fromText' pid)
+      (parseHash $ coerce $ _cmPactId c)
       (Just $ _cmStep c)
       (Just $ _cmRollback c)
-      (Just $ _getLegacyValue $ _cmData c)
+      (Just $ _cmData c)
       (_cmProof c)
       Nothing
       Nothing
@@ -99,7 +100,7 @@ txInputsToApiReq txi = do
         Nothing
         Nothing
         Nothing
-        (hush d)
+        (coerce <$> hush d)
         Nothing
         Nothing
         (hush c)
@@ -151,9 +152,9 @@ instance FromJSON TxInputs where
           PttCont -> Left <$> parseJSON v
           PttExec -> do
             mc :: Maybe (Either Text FilePath) <- parseMaybePair o "code"
-            md :: Maybe (Either Value FilePath) <- parseMaybePair o "data"
+            md :: Maybe (Either (StableEncoding PactValue) FilePath) <- parseMaybePair o "data"
             c <- maybe (fail "Must have exec or cont fields") pure mc
-            let d = fromMaybe (Left $ object []) md
+            let d = fromMaybe (Left $ PObject M.empty) $ coerce <$> md
             pure $ Right $ ExecInputs c d
 
         -- We want to allow both "meta" and "publicMeta" here to make this tool

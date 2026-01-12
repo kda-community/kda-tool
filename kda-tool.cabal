@@ -81,7 +81,7 @@ library
     , mwc-random
     , network-uri
     , optparse-applicative
-    , pact
+    , pact-tng:pact-request-api
     , pact-json
     , process
     , resource-pool
@@ -164,7 +164,7 @@ test-suite kda-tool-tests
     , mwc-random
     , network-uri
     , optparse-applicative
-    , pact
+    , pact-tng:pact-request-api
     , pact-json
     , process
     , resource-pool

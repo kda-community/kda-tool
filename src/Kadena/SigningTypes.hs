@@ -9,9 +9,11 @@
 
 module Kadena.SigningTypes where
 
+import Data.Coerce
 import Control.Lens hiding ((.=))
 import Control.Monad
 import qualified Data.Aeson as A
+import qualified Pact.JSON.Encode as J
 import Data.Aeson.Types
 import qualified Data.ByteString.Lazy as BSL
 import Data.Char as Char
@@ -23,16 +25,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import GHC.Generics
 
-import Pact.ApiReq
-import qualified Pact.JSON.Encode as J
-import Pact.Types.Capability (SigCapability(..))
-import Pact.Types.ChainMeta
-import Pact.Types.Command
-import Pact.Types.Hash
-import Pact.Parse
-import Pact.Types.Runtime (GasLimit(..), ChainId, NetworkId, PublicKeyText)
--- TODO: Rip out sig data dependency
-import Pact.Types.SigData (PublicKeyHex(..))
+import Pact.Core.Command.SigData
+import Pact.Core.Command.Types
+import Pact.Core.Command.Client
 
 -- The spec calls this `Signer` but it clashes too much with Pact`s `Signer` type
 data CSDSigner = CSDSigner
@@ -88,7 +83,7 @@ instance FromJSON CommandSigData where
 
 --------------------------------------------------------------------------------
 data SigningOutcome =
-    SO_Success PactHash
+    SO_Success Hash
   | SO_Failure Text
   | SO_NoSig
   deriving (Eq,Ord,Show,Generic)
@@ -96,7 +91,7 @@ data SigningOutcome =
 instance ToJSON SigningOutcome where
   toJSON a = case a of
     SO_Success h -> object ["result" .= ("success" :: Text), "hash" .= hashTxt ]
-      where hashTxt = hashToText $ toUntypedHash h
+      where hashTxt = T.decodeUtf8 $ BSL.toStrict $ J.encode h
     SO_Failure msg -> object ["result" .= ("failure" :: Text), "msg" .= msg ]
     SO_NoSig -> object ["result" .= ("noSig" :: Text)]
 
@@ -155,12 +150,14 @@ commandSigDataToCommand = fmap fst . commandSigDataToParsedCommand
 
 commandSigDataToParsedCommand :: CommandSigData -> Either String (Command Text, Payload PublicMeta ParsedCode)
 commandSigDataToParsedCommand (CommandSigData (SignatureList sigList) c) = do
-  payload :: Payload PublicMeta ParsedCode <- traverse parsePact =<< A.eitherDecodeStrict' (T.encodeUtf8 c)
+  payload :: Payload (StableEncoding PublicMeta) ParsedCode <- traverse parsePact' =<< A.eitherDecodeStrict' (T.encodeUtf8 c)
   let sigMap = M.fromList $ (\(CSDSigner k v) -> (k, v)) <$> sigList
   -- It is ok to use a map here because we're iterating over the signers list and only using the map for lookup.
       sigs = catMaybes $ map (\signer -> join $ M.lookup (PublicKeyHex $ _siPubKey signer) sigMap) $ _pSigners payload
       h = hash (T.encodeUtf8 c)
-  pure (Command c sigs h, payload)
+  pure (Command c sigs h, coerce payload)
+    where
+      parsePact' = either (Left . show) Right . parsePact
 
 --------------------------------------------------------------------------------
 newtype AccountName = AccountName
@@ -217,10 +214,22 @@ compactEncoding = defaultOptions
 -- If these orphans conflict with future ToJSON instances, we can remove them.
 
 instance ToJSON SigCapability where toJSON = J.toJsonViaEncode
-instance ToJSON PublicKeyText where toJSON = J.toJsonViaEncode
-instance ToJSON TTLSeconds where toJSON = J.toJsonViaEncode
-instance ToJSON GasLimit where toJSON = J.toJsonViaEncode
-instance ToJSON ChainId where toJSON = J.toJsonViaEncode
+
+instance ToJSON PublicKeyText where toJSON = coerce . J.toJsonViaEncode . StableEncoding
+instance FromJSON PublicKeyText where parseJSON = coerce <$> parseJSON @(StableEncoding PublicKeyText)
+
+instance ToJSON TTLSeconds where toJSON = coerce . J.toJsonViaEncode . StableEncoding
+instance FromJSON TTLSeconds where parseJSON = coerce <$> parseJSON @(StableEncoding TTLSeconds)
+
+instance ToJSON GasLimit where toJSON = coerce . J.toJsonViaEncode . StableEncoding
+instance FromJSON GasLimit where parseJSON = coerce <$> parseJSON @(StableEncoding GasLimit)
+
+instance ToJSON ChainId where toJSON = coerce . J.toJsonViaEncode . StableEncoding
+instance FromJSON ChainId where parseJSON = coerce <$> parseJSON @(StableEncoding ChainId)
+
+instance ToJSON PactValue where toJSON = coerce . J.toJsonViaEncode . StableEncoding
+instance FromJSON PactValue where parseJSON = coerce <$> parseJSON @(StableEncoding PactValue)
+
 instance ToJSON NetworkId where toJSON = J.toJsonViaEncode
 instance J.Encode a => ToJSON (Command a) where toJSON = J.toJsonViaEncode
 instance ToJSON ApiSigner where toJSON = J.toJsonViaEncode

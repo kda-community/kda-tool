@@ -21,12 +21,8 @@ import qualified Data.YAML.Aeson as YA
 import           Kadena.SigningApi
 import           Kadena.SigningTypes
 import           Katip
-import           Pact.Types.Capability
-import           Pact.Types.ChainMeta
-import           Pact.Types.Command
-import           Pact.Types.KeySet
-import           Pact.Types.Names
-import           Pact.Types.RPC
+import           Pact.Core.Command.RPC
+import           Pact.Core.Command.Types
 import           Servant.API
 import           Servant.Client
 import           System.Exit
@@ -164,7 +160,7 @@ csdToSigningRequest csd = do
       Continuation _ -> Left "Cannot sign CONT transactions with the old signing API"
       Exec m -> do
         let code = _pcCode $ _pmCode m
-            d = _getLegacyValue (_pmData m) ^? _Object
+            d = Just $ _pmData m
         let caps = map mkDappCap $ S.toList $ S.fromList $ concatMap _siCapList $ _pSigners p
         let n = Just $ _pNonce p
             meta = _pMeta p
@@ -178,7 +174,7 @@ csdToSigningRequest csd = do
         pure $ SigningRequest code d caps n cid gasLimit ttl sender extraSigners
 
 mkDappCap :: SigCapability -> DappCap
-mkDappCap sc = DappCap (_qnName $ _scName sc) "desc" sc
+mkDappCap sc = DappCap (_qnName $ _ctName $ _sigCapability  sc) "desc" sc
 
 signYamlFile :: FilePath -> IO (Either String CommandSigData)
 signYamlFile msgFile = do

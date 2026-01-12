@@ -26,11 +26,10 @@ import           Network.Connection
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Status
---import           Pact.ApiReq
-import qualified Pact.ApiReq as Pact
 import qualified Pact.JSON.Encode as J
-import           Pact.Types.Command
-import           Pact.Types.SigData
+import           Pact.Core.Command.SigData
+import           Pact.Core.Command.Types
+import           Pact.Core.Command.Client
 import           System.IO
 import           Text.Printf
 ------------------------------------------------------------------------------
@@ -98,8 +97,8 @@ genFromContents op tplContents useOldOutput = do
                               M.union (M.filter (/= Null) vars) rest
         txts <- hoistEither $ first prettyFailure $ fillValueVars tpl augmentedVars
         txis :: [TxInputs] <- sequence $ map (hoistEither . parseTxInputs) txts
-        apiReqs :: [Pact.ApiReq] <- mapM (lift . txInputsToApiReq) txis
-        cmds :: [Command Text] <- mapM (fmap snd . lift . Pact.mkApiReqCmd True "") apiReqs
+        apiReqs :: [ApiReq] <- mapM (lift . txInputsToApiReq) txis
+        cmds :: [Command Text] <- mapM (fmap snd . lift . mkApiReqCmd True "") apiReqs
         let chooseFormat i =
               if useOldOutput
                 then pure $ encodeText $ J.toJsonViaEncode i
