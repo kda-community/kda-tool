@@ -112,6 +112,9 @@ executable kda
   build-depends:
       base
     , kda-tool
+
+  other-modules: Paths_kda_tool
+
   hs-source-dirs:      exe
   default-language:    Haskell2010
   ghc-options: -threaded -Wall -Wno-unticked-promoted-constructors -fno-show-valid-hole-fits

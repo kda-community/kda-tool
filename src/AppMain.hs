@@ -9,6 +9,7 @@ module AppMain where
 import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Default
+import           Data.Version
 import           Data.String (fromString)
 import           Katip
 import           Network.HTTP.Client hiding (withConnection)
@@ -35,8 +36,9 @@ import           Commands.WalletSign
 import           Types.Env
 ------------------------------------------------------------------------------
 
-appMain :: IO ()
-appMain = do
+
+appMain :: Version -> IO ()
+appMain version = do
     Args c severity verbosity mcf <- execParser opts
     mgr <- newManager tlsManagerSettings
 
@@ -76,7 +78,7 @@ appMain = do
       WalletSign args -> walletSignCommand theEnv args
 
   where
-    opts = info (envP <**> helper) $ mconcat
+    opts = info (envP <**> simpleVersioner (showVersion version) <**> helper) $ mconcat
       [ fullDesc
       , header "kda - Command line tool for interacting with the Kadena blockchain"
       , footerDoc (Just theFooter)
@@ -86,4 +88,3 @@ appMain = do
       , ""
       , "source <(kda --bash-completion-script `which kda`)"
       ]
-
