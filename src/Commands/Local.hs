@@ -31,7 +31,7 @@ import           Utils
 ------------------------------------------------------------------------------
 
 localCommand :: Env -> LocalCmdArgs -> IO ()
-localCommand e (LocalCmdArgs args verifySigs shortOutput) = do
+localCommand e (LocalCmdArgs args verifySigs preflight shortOutput) = do
   let le = _env_logEnv e
   case _nodeTxCmdArgs_files args of
     [] -> putStrLn "No tx files specified"
@@ -47,7 +47,7 @@ localCommand e (LocalCmdArgs args verifySigs shortOutput) = do
           logEnv e DebugS $ fromStr $
             printf "%s: testing %d commands on %d chains\n"
               (schemeHostPortToText shp) (length txs) (length groups)
-          responses <- lift $ mapM (localNodeQuery le verifySigs n) txs
+          responses <- lift $ mapM (localNodeQuery le verifySigs preflight n) txs
           pure $ fromText (schemeHostPortToText shp) .= map responseToValue responses
       case res of
         Left er -> putStrLn er >> exitFailure

@@ -292,6 +292,7 @@ data NodeTxCmdArgs = NodeTxCmdArgs
 data LocalCmdArgs = LocalCmdArgs
   { _localTxCmdArgs_txArgs :: NodeTxCmdArgs
   , _localTxCmdArgs_sigVerification :: Bool
+  , _localTxCmdArgs_preflight :: Bool
   , _localTxCmdArgs_shortOutput :: Bool
   } deriving (Eq,Ord,Show,Read)
 
@@ -327,12 +328,18 @@ nodeTxCmdP :: Parser NodeTxCmdArgs
 nodeTxCmdP = NodeTxCmdArgs <$> many txFileP <*> optional schemeHostPortOptP
 
 localCmdP :: Parser LocalCmdArgs
-localCmdP = LocalCmdArgs <$> nodeTxCmdP <*> noVerifySigsP <*> shortOutputP
+localCmdP = LocalCmdArgs <$> nodeTxCmdP <*> noVerifySigsP <*> preFlightP <*> shortOutputP
 
 noVerifySigsP :: Parser Bool
 noVerifySigsP = flag True False $ mconcat
   [ long "no-verify-sigs"
   , help "Don't verify signatures (useful for testing txs before signing)"
+  ]
+
+preFlightP :: Parser Bool
+preFlightP = flag False True $ mconcat
+  [ long "preflight"
+  , help "Do a preflight local call (include sender's verification)"
   ]
 
 shortOutputP :: Parser Bool

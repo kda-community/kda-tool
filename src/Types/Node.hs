@@ -222,19 +222,23 @@ sendToNode le n ts@(t NE.:| _) = do
     url = T.unpack root <> "/send"
     root = nodePactRoot n $ _chainwebMeta_chainId $ _pactCommand_meta $ _transaction_cmd t
 
-localNodeQuery :: LogEnv -> Bool -> Node -> Transaction -> IO (Response LB.ByteString)
-localNodeQuery le sigVerification n t = do
+localNodeQuery :: LogEnv -> Bool -> Bool -> Node -> Transaction -> IO (Response LB.ByteString)
+localNodeQuery le sigVerification preflight n t = do
     req0 <- parseRequest url
     let req = req0
           { method = "POST"
           , requestBody = RequestBodyLBS $ encode t
           , requestHeaders = [(hContentType, "application/json")]
           }
-    logFLE le DebugS req "sending local"
+    logFLE le DebugS req $ "sending local " <> logStr url
     httpLbs req (_node_httpManager n)
   where
     url = T.unpack root <> addQS "/local"
-    addQS p = if sigVerification then p else p <> "?signatureVerification=false&preflight=true"
+    addQS p = case (sigVerification, preflight) of
+      (False, False) -> p <> "?signatureVerification=false"
+      (False,  True) -> p <> "?signatureVerification=false&preflight=true"
+      (True , False) -> p
+      (True ,  True) -> p <> "?preflight=true"
     root = nodePactRoot n $ _chainwebMeta_chainId $ _pactCommand_meta $ _transaction_cmd t
 
 responseToValue :: Response LB.ByteString -> Value
