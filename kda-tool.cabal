@@ -60,8 +60,6 @@ library
     , tls
     , crypton-connection
     , containers
-    , cryptohash-sha256
-    , cryptohash-sha512
     , crypton
     , data-default
     , directory
@@ -146,8 +144,6 @@ test-suite kda-tool-tests
     , tls
     , crypton-connection
     , containers
-    , cryptohash-sha256
-    , cryptohash-sha512
     , crypton
     , data-default
     , directory
@@ -192,6 +188,7 @@ test-suite kda-tool-tests
   other-modules:
     Commands.GenTx
     HostPortSpec
+    Kadena.SigningTypes
     Keys
     TemplateSpec
     TxTemplate
