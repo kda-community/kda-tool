@@ -85,7 +85,7 @@ signYamlFile kkey mindex enc msgFile = do
           cmd = _csd_cmd csd
           signingKeys = S.fromList $ map _s_pubKey $ unSignatureList sigs
       case kkey of
-        HDRoot xprv mpass -> tryHdIndex msgFile csd xprv mpass mindex
+        HDRoot seed mpass -> tryHdIndex msgFile csd seed mpass mindex
         PlainKeyPair sec pub -> do
           let pubHex = PublicKeyHex $ toB16 $ BA.convert pub
           if S.member pubHex signingKeys
@@ -101,14 +101,15 @@ signYamlFile kkey mindex enc msgFile = do
 tryHdIndex
   :: FilePath
   -> CommandSigData
-  -> Crypto.XPrv
+  -> ByteString
   -> Maybe Text
   -> Maybe KeyIndex
   -> IO (Maybe (FilePath, Int))
-tryHdIndex msgFile csd xprv mpass mind = do
+tryHdIndex msgFile csd seed mpass mind = do
   let startingSigs = _csd_sigs csd
       cmd = _csd_cmd csd
       cmdBS = encodeUtf8 cmd
+      xprv = seedToRoot seed mpass
       signingKeys = S.fromList $ map _s_pubKey $ unSignatureList startingSigs
       signPairs = getSigningInds signingKeys xprv mpass (maybe [0..100] (:[]) mind)
       f (esec, pub) = addSig pub (ED25519Sig $ sigToText $ signHD esec (fromMaybe "" mpass) (calcHash cmdBS))
@@ -133,7 +134,7 @@ getSigningInds
   -> [(EncryptedPrivateKey, PublicKeyHex)]
 getSigningInds signingKeys xprv mpass inds = filter inSigningKeys pairs
   where
-    pairs = map (mkPair . generateCryptoPairFromRoot xprv (fromMaybe "" mpass)) inds
+    pairs = map (mkPair . generateCryptoPairFromRoot xprv mpass) inds
     mkPair (esec, pub) = (esec, PublicKeyHex $ pubKeyToText pub)
     inSigningKeys pair = S.member (snd pair) signingKeys
 
@@ -155,8 +156,8 @@ signOther msgFile kkey kind enc = do
     msg <- fmapLT mkParseErr $
       hoistEither $ genericDecode enc rawbs
     let (pubKey, sig) = case kkey of
-          HDRoot xprv mpass ->
-            let (esec, pub) = generateCryptoPairFromRoot xprv (fromMaybe "" mpass) kind
+          HDRoot seed mpass ->
+            let (esec, pub) = generateCryptoPairFromRoot (seedToRoot seed mpass) mpass kind
             in (pub, sigToText $ signHD esec (fromMaybe "" mpass) msg)
           PlainKeyPair sec pub -> (PublicKey $ BA.convert pub, toB16 $ BA.convert $ sign sec msg)
     lift $ T.putStrLn $ pubKeyToText pubKey <> ": " <> sig

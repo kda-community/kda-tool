@@ -24,6 +24,7 @@ import           Data.ByteArray (ByteArrayAccess)
 import qualified Data.ByteArray as BA
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import           Data.Either (fromRight)
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as Map
 import           Data.String (IsString, fromString)
@@ -43,17 +44,17 @@ import Data.Base16.Types (extractBase16)
 ------------------------------------------------------------------------------
 
 mnemonicToRoot :: MnemonicPhrase -> Crypto.XPrv
-mnemonicToRoot phrase = seedToRoot (phraseToSeed phrase) "" -- TODO: Empty passowrd
+mnemonicToRoot phrase = seedToRoot (phraseToSeed phrase) Nothing -- TODO: Empty passowrd
 
 genMnemonic12 :: MonadIO m => m (Either Text (Crypto.MnemonicSentence 12))
 genMnemonic12 = liftIO $ bimap tshow Crypto.entropyToWords . Crypto.toEntropy @128
   -- This size must be a 1/8th the size of the 'toEntropy' size: 128 / 8 = 16
   <$> Crypto.Random.Entropy.getEntropy @ByteString 16
 
-generateCryptoPairFromRoot :: Crypto.XPrv -> Text -> KeyIndex -> (EncryptedPrivateKey, PublicKey)
+generateCryptoPairFromRoot :: Crypto.XPrv -> Maybe Text -> KeyIndex -> (EncryptedPrivateKey, PublicKey)
 generateCryptoPairFromRoot root pass i =
   let hardenedIdx = 0x80000000 .|. (fromKeyIndex i)
-      xprv = Crypto.deriveXPrv scheme (T.encodeUtf8 pass) root hardenedIdx
+      xprv = Crypto.deriveXPrv scheme (T.encodeUtf8 $ fromMaybe "" pass) root hardenedIdx
   in (EncryptedPrivateKey xprv, PublicKey $ Crypto.xpubPublicKey $ Crypto.toXPub xprv)
   where
     scheme = Crypto.DerivationScheme2
@@ -117,8 +118,8 @@ sentenceToSeed s = Crypto.sentenceToSeed s Crypto.english ""
 -- |Takes a n-sentence crypto seed and a password, and produces an encrypted key that can be
 -- unlocked with the password
 -- TODO: enter password 2x, to confirm
-seedToRoot :: Crypto.Seed -> Text -> Crypto.XPrv
-seedToRoot seed password = Crypto.generate seed (T.encodeUtf8 password)
+seedToRoot :: ByteArrayAccess ba => ba -> Maybe Text -> Crypto.XPrv
+seedToRoot seed password = Crypto.generate seed $ T.encodeUtf8 $ fromMaybe "" password
 
 -- | Convenience function for unpacking byte array things into 'Text'
 newtype WordKey = WordKey { _unWordKey :: Int }
@@ -128,7 +129,7 @@ wordsToPhraseMap :: [Text] -> Map.Map WordKey Text
 wordsToPhraseMap = Map.fromList . zip [WordKey 1 ..]
 
 data KadenaKey
-  = HDRoot Crypto.XPrv (Maybe Text)
+  = HDRoot ByteString (Maybe Text) --Seed + Maybe Chaibnweaver password
   | PlainKeyPair ED25519.SecretKey ED25519.PublicKey
 
 data KeyPairYaml = KeyPairYaml
@@ -168,22 +169,26 @@ decodeMnemonic t = do
     Just phrase -> do
        case phraseToEitherSeed phrase of
          Left _ -> pure $ Left "failed converting phrase to seed"
-         Right seed -> pure $ Right $ HDRoot (seedToRoot seed "") Nothing
+         Right seed -> pure $ Right $ HDRoot (BA.convert seed) Nothing
 
 decodeEncryptedMnemonic :: Text -> IO (Either String KadenaKey)
-decodeEncryptedMnemonic t = do
-  case Crypto.xprv =<< fmapL T.unpack (B16.decodeBase16Untyped (T.encodeUtf8 t)) of
-    Left _ -> pure $ Left "Could not decode HD key"
-    Right xprv -> do
+decodeEncryptedMnemonic t =
+  -- We now that a valid encrypted key has a length of 128
+  case (BS.length seed) of
+    128 -> do
       hSetBuffering stderr NoBuffering
       hPutStr stderr "Enter password to decrypt key: "
       pass <- T.pack <$> withoutInputEcho getLine
       hPutStrLn stderr ""
-      pure $ Right $ HDRoot xprv (Just pass)
+      return $ Right $ HDRoot seed (Just pass)
+    _ -> pure $ Left "Could not decode HD key"
+
+  where
+    seed = (fromRight BS.empty . B16.decodeBase16Untyped . T.encodeUtf8) t
 
 genPairFromPhrase :: MnemonicPhrase -> KeyIndex -> (EncryptedPrivateKey, PublicKey)
 genPairFromPhrase phrase idx =
-  generateCryptoPairFromRoot (mnemonicToRoot phrase) "" idx
+  generateCryptoPairFromRoot (mnemonicToRoot phrase) Nothing idx
 
 newtype PublicKey = PublicKey ByteString
   deriving (Eq, Ord, Show)

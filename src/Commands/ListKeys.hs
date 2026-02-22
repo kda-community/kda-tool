@@ -20,9 +20,9 @@ listKeysCommand efc mInd = do
   ekey <- readKadenaKey h
   case ekey of
     Left e -> printf "Error reading key from %s: %s\n" keyfile e
-    Right (HDRoot xprv mpass) -> do
-      let pass = fromMaybe "" mpass
-      let getAndShow n = tshow (unKeyIndex n) <> ": " <> pubKeyToText (snd $ generateCryptoPairFromRoot xprv pass n)
+    Right (HDRoot seed mpass) -> do
+      let xprv = seedToRoot seed mpass
+      let getAndShow n = tshow (unKeyIndex n) <> ": " <> pubKeyToText (snd $ generateCryptoPairFromRoot xprv mpass n)
       let ind = fromMaybe 5 mInd
       mapM_ (T.putStrLn . getAndShow) [0..ind]
     Right (PlainKeyPair _ pub) -> do
