@@ -10,7 +10,7 @@ import           Data.ByteString.Base16
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Pact.Types.Crypto
+import           Pact.Core.Command.Crypto
 ------------------------------------------------------------------------------
 import           Keys
 import           Types.KeyType

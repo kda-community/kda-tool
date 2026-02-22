@@ -3,7 +3,6 @@
 module TemplateSpec where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.Trans
 import           Data.Aeson
 import           Data.Either
 import           Data.Map (Map)

@@ -1,5 +1,25 @@
 packages: kda-tool.cabal
 
+program-options
+  ghc-options: -Wno-missed-extra-shared-lib
+
+if os(darwin)
+    if arch(aarch64)
+        package *
+            extra-include-dirs:
+                /opt/homebrew/include
+                /opt/homebrew/opt/openssl/include
+            extra-lib-dirs:
+                /opt/homebrew/lib
+                /opt/homebrew/opt/openssl/lib
+    else
+        package *
+            extra-include-dirs:
+                /opt/local/include
+                /usr/local/opt/openssl/include
+            extra-lib-dirs:
+                /opt/local/lib
+                /usr/local/opt/openssl/lib/
 package pact
     ghc-options: -Wwarn
     -- avoid conflict with cryptonite during linking
@@ -7,42 +27,37 @@ package pact
 
 source-repository-package
     type: git
-    location: https://github.com/kadena-io/HsYAML.git
-    tag: b3c49dbceb39733dfc07c22f2097d3c74fc86e74
-    --sha256: sha256-lnnUni7D949nM4faMrORMetZi5wJy2Qhchm9ne6Cqv8=
-
-source-repository-package
-    type: git
-    location: https://github.com/kadena-io/HsYAML-aeson.git
-    tag: 84292468200166b96ff4e8c7324ee01e6ab6d181
-    --sha256: sha256-zaDcqwSs4ASb7PO3+E9oGzmSXlSt7bL1NiP0red7CiY=
-
-source-repository-package
-    type: git
-    location: https://github.com/kadena-io/cardano-crypto.git
-    tag: 4590efa638397e952a51a8994b5543e4ea3c1ecd
-    --sha256: 0hl2n3bba5v2j0lmxhs7hs01z3aznh2bwf9cb434icq2g0bl8ms3
-
-source-repository-package
-    type: git
-    location: https://github.com/kadena-io/chainweb-api.git
+    location: https://github.com/kda-community/chainweb-api.git
     tag: 1b2de025cfdc09698bfb1ec3807cd85405d6a339
-    --sha256: sha256-06jvD1kmkmthcRkyWhVLTbytwabghInxqXQD/Lm7kbA=
 
 source-repository-package
     type: git
-    location: https://github.com/kadena-io/pact.git
-    tag: a1c7906efbf32095883e71594a53a21162fbe5a7
-    --sha256: sha256-Mtgz/ilxa81TDUoBKQv5x3BlOftFjNV1Ak0uYzSguNQ=
+    location: https://github.com/kda-community/pact-5.git
+    tag: f9bb9979091f8eae658a804e88bf313b57c924be
 
 source-repository-package
   type: git
-  location: https://github.com/kadena-io/pact-json.git
+  location: https://github.com/kda-community/pact-json.git
   tag: 1d260bfaa48312b54851057885de4c43c420e35f
-  --sha256: 0fzq4mzaszj5clvixx9mn1x6r4dcrnwvbl2znd0p5mmy5h2jr0hh
 
 source-repository-package
   type: git
-  location: https://github.com/kadena-io/kadena-ethereum-bridge.git
-  tag: a32d901e4a79be62af9c27c01152c9a4c3912a62
-  --sha256: sha256-xdawv/tdjh61MbJKcBqm9Fje36+gVljuZsAxOTX1gP0=
+  location: https://github.com/kda-community/kadena-ethereum-bridge.git
+  tag: 8df1cff7f279750490fea8ff580294f3e5a3fcaf
+  --sha256: sha256-HyWTEtw/dKQduXl5avRckS0oNc9Z5yxeUxvX09wDkDY=
+
+source-repository-package
+  type: git
+  location: https://github.com/kda-community/ralist.git
+  tag: fd79fc4454e1b703299ab0a2aa5dabd86c9cacfa
+
+
+source-repository-package
+    type: git
+    location: https://github.com/kda-community/HsYAML.git
+    tag: b3c49dbceb39733dfc07c22f2097d3c74fc86e74
+
+source-repository-package
+    type: git
+    location: https://github.com/kda-community/HsYAML-aeson.git
+    tag: 84292468200166b96ff4e8c7324ee01e6ab6d181

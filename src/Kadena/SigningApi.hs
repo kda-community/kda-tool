@@ -10,10 +10,10 @@ import Data.Aeson
 import Data.Proxy
 import Data.Text (Text)
 import GHC.Generics
-import Pact.Types.Capability (SigCapability(..))
-import Pact.Types.ChainMeta (TTLSeconds(..))
-import Pact.Types.Runtime (GasLimit(..), ChainId, PublicKeyText)
-import Pact.Types.Command (Command)
+import Pact.Core.Command.Types
+import Pact.Core.Command.Client
+
+
 import Servant.API
 
 import Kadena.SigningTypes
@@ -38,7 +38,7 @@ instance FromJSON DappCap where
 
 data SigningRequest = SigningRequest
   { _signingRequest_code :: Text
-  , _signingRequest_data :: Maybe Object
+  , _signingRequest_data :: Maybe PactValue
   , _signingRequest_caps :: [DappCap]
   , _signingRequest_nonce :: Maybe Text
   , _signingRequest_chainId :: Maybe ChainId

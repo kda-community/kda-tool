@@ -38,7 +38,7 @@ import qualified Data.YAML.Token as Y
 import           Kadena.SigningTypes
 import           GHC.Generics
 import           Options.Applicative hiding (Parser)
-import           Pact.Types.Command
+import           Pact.Core.Command.Types
 import           System.Directory
 import           System.FilePath
 import Data.Vector.Internal.Check (HasCallStack)
