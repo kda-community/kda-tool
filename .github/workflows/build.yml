@@ -1,24 +1,36 @@
-name: Build project
 
-on: push
+name: Build
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths:
+    - '**'
+    - '!.github/**'
+    - '.github/workflows/applications.yml'
 
 jobs:
   build:
-    name: Build
+    if: "!startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        ghc: ['9.6.4']
-        cabal: ['3.8']
-        os: ['ubuntu-20.04', 'ubuntu-22.04', 'macOS-latest']
+        ghc: ["9.10.3"]
+        cabal: ["3.12"]
+        os: ["ubuntu-22.04", "ubuntu-24.04", "macos-14", "macos-15"]
 
     steps:
-    # Setup
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with:
+          ref: ${{ inputs.commit_sha || github.sha }}
 
     # Haskell Setup
+    - name: Set permissions for .ghcup (ubuntu)
+      if: startsWith(matrix.os, 'ubuntu-')
+      run: sudo chown -R $USER /usr/local/.ghcup
     - name: Install GHC and Cabal
       uses: haskell-actions/setup@v2
       with:
@@ -29,140 +41,95 @@ jobs:
         ghc --version
         cabal --version
 
-    # System dependencies
-    - if: startsWith(matrix.os, 'macOS')
-      name: Set up system depdendencies
-      run: |
-        brew install openssl
+    - name: Setting up MPFR (Ubuntu)
+      if: startsWith(matrix.os, 'ubuntu-')
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libmpfr-dev
 
+    # Project Setup
+    - name: Create cabal.project.local
+      shell: bash
+      run: |
         cat > cabal.project.local <<EOF
-        package *
-          extra-include-dirs:
-              /opt/homebrew/include
-              /opt/homebrew/opt/openssl/include
-          extra-lib-dirs:
-              /opt/homebrew/lib
-              /opt/homebrew/opt/openssl/lib
+        documentation: False
+        package pact
+          tests: True
+          benchmarks: True
+          documentation: False
+          optimization: 1
+          flags: ${{ matrix.flags }} +cryptonite-ed25519
+        extra-include-dirs:
+          /opt/local/include
+          /usr/local/opt/openssl/include
+        extra-lib-dirs:
+          /opt/local/lib
+          /usr/local/opt/openssl/lib/
         EOF
 
-    # dist cache
-    # the cache-key forces uploading of cache at least once a day, which ensures that
-    # upstream dependency changes are captured regularly.
-    - name: Create date file for dist-newstyle cache key
-      id: cache-date
+    - name: Extend cabal.project.local for GHC-9.0.2
+      if: "startsWith(matrix.ghc, '9')"
+      shell: bash
       run: |
-        echo "value=$(date +%Y.%j)" >> $GITHUB_OUTPUT
-    - uses: actions/cache@v3
-      name: Cache dist-newstyle
-      with:
-        path: |
-          ~/.cabal/packages
-          ~/.cabal/store
-          dist-newstyle
-        key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-date.outputs.value }}-${{ hashFiles('cabal.*', '*.cabal', 'src/**', 'test/**') }}
-        restore-keys: |
-          ${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-date.outputs.value }}-
-          ${{ matrix.os }}-${{ matrix.ghc }}-
+        cat >> cabal.project.local <<EOF
+        package pact
+          ghc-options: -Wwarn -Wunused-packages
+        EOF
 
-    # Build
+    - name: Add check for unused packages
+      shell: bash
+      run: |
+        cat >> cabal.project.local <<EOF
+        package pact
+          ghc-options: -Wunused-packages
+        EOF
+
+    - name: Print cabal.project.local
+      shell: bash
+      run: cat cabal.project.local
+
     - name: Update package database
+      shell: bash
       run: cabal update
-    - name: Display outdated packages
-      run: cabal outdated
-    - name: Install build dependencies
-      run: cabal build --only-dependencies
-    - name: Build
-      run: cabal build
-    - name: Show installed packages
-      run: cabal freeze && cat cabal.project.freeze
 
-    # Upload artifacts
-    - name: Copy build artifact
-      run: cp `cabal list-bin exe:kda` .
-    - name: Stripping binary
-      run: strip kda
-    - uses: actions/upload-artifact@v4
-      with:
-        name: kda-build-${{ matrix.os }}-${{ matrix.ghc }}
-        path: kda
-
-    # Test
-    - name: Test
-      run: cabal test
-
-  # ########################################################################## #
-  # Build and publish docker image
-
-  docker-image:
-    name: Build and publish docker image
-    needs: [build]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        ghc: ["9.6.4"]
-        os: ["ubuntu-20.04"]
-
-    steps:
-    - name: Get build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: kda-build-${{ matrix.os }}-${{ matrix.ghc }}
-        path: .
-
-    - name: Create Dockerfile
+    - name: Configure build / and freeze
       run: |
-        chmod 755 kda
-        export OS=${{ matrix.os }}
-        cat > Dockerfile <<EOF
-        FROM ubuntu:${OS#ubuntu-}
-        LABEL com.chainweb.docker.image.compiler="ghc-${{ matrix.ghc }}"
-        LABEL com.chainweb.docker.image.os="${OS}"
-        RUN apt-get update && apt-get install -y ca-certificates libgmp10 libssl1.1 locales && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-        ENV LANG=en_US.UTF-8
-        WORKDIR /home/kda
-        COPY kda /usr/bin/
-        ENTRYPOINT ["/usr/bin/kda"]
-        EOF
+        cabal build --dry-run
+        cabal freeze
 
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@v3
+    - name: Generate cache key
+      id: cache-key
+      run: |
+        grep -v '^index-state:' cabal.project.freeze > freeze-deps-only
+        FREEZE_HASH=$(shasum freeze-deps-only | cut -d' ' -f1)
+        echo "freeze-hash=$FREEZE_HASH" >> $GITHUB_OUTPUT
+        rm freeze-deps-only
+
+    - name: Restore Cabal store
+      id: restore-cabal
+      uses: actions/cache/restore@v4
       with:
-        images: ghcr.io/kadena-io/kda-tool
-        tags: |
-          type=sha
-          type=ref,event=branch
-          type=ref,event=tag
-          type=ref,event=pr
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-
-    - name: Cache Docker layers
-      uses: actions/cache@v3
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        path: ~/.cabal/store
+        key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-key.outputs.freeze-hash }}
         restore-keys: |
-          ${{ runner.os }}-buildx-
+          cabal-${{ matrix.os }}-${{ matrix.ghc }}
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
+    - name: Build dependencies
+      if: steps.restore-cabal.outputs.cache-hit != 'true'
+      shell: bash
+      run: cabal build --only-dependencies
+
+    - name: Cache Cabal store if necessary
+      if: steps.restore-cabal.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
       with:
-        registry: ghcr.io
-        username: kadena-build
-        password: ${{ secrets.GITHUB_TOKEN }}
+        path: ~/.cabal/store
+        key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-key.outputs.freeze-hash }}
 
-    - name: Build and push
-      id: docker_build
-      uses: docker/build-push-action@v2
-      with:
-        push: true
-        context: .
-        file: ./Dockerfile
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,dest=/tmp/.buildx-cache
+    - name: Build
+      shell: bash
+      run: cabal build
 
+    - name: Verify Binary Linking
+      shell: bash
+      if: "!contains(matrix.flags, '-build-tool')"
+      run: cabal run exe:kda -- --version

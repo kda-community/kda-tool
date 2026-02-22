@@ -1,16 +1,17 @@
+cabal-version:       3.8
 name:                kda-tool
 version:             1.1
 synopsis:            Kadena command line tool
 -- description:
 -- bug-reports:
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Doug Beardsley
 maintainer:          mightybyte@gmail.com
 copyright:           Kadena LLC
 -- category:
 build-type:          Simple
-cabal-version:       >=1.10
+
 
 library
   -- other-modules:
@@ -56,11 +57,10 @@ library
     , cardano-crypto
     , cassava
     , chainweb-api
-    , connection
+    , tls
+    , crypton-connection
     , containers
-    , cryptohash-sha256
-    , cryptohash-sha512
-    , cryptonite
+    , crypton
     , data-default
     , directory
     , dlist
@@ -79,7 +79,7 @@ library
     , mwc-random
     , network-uri
     , optparse-applicative
-    , pact
+    , pact-tng:pact-request-api
     , pact-json
     , process
     , resource-pool
@@ -110,6 +110,9 @@ executable kda
   build-depends:
       base
     , kda-tool
+
+  other-modules: Paths_kda_tool
+
   hs-source-dirs:      exe
   default-language:    Haskell2010
   ghc-options: -threaded -Wall -Wno-unticked-promoted-constructors -fno-show-valid-hole-fits
@@ -138,11 +141,10 @@ test-suite kda-tool-tests
     , cardano-crypto
     , cassava
     , chainweb-api
-    , connection
+    , tls
+    , crypton-connection
     , containers
-    , cryptohash-sha256
-    , cryptohash-sha512
-    , cryptonite
+    , crypton
     , data-default
     , directory
     , dlist
@@ -161,7 +163,7 @@ test-suite kda-tool-tests
     , mwc-random
     , network-uri
     , optparse-applicative
-    , pact
+    , pact-tng:pact-request-api
     , pact-json
     , process
     , resource-pool
@@ -186,6 +188,7 @@ test-suite kda-tool-tests
   other-modules:
     Commands.GenTx
     HostPortSpec
+    Kadena.SigningTypes
     Keys
     TemplateSpec
     TxTemplate

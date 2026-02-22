@@ -21,8 +21,8 @@ import qualified Data.Text.IO as T
 import           Data.Text.Encoding
 import qualified Data.YAML.Aeson as YA
 import           Kadena.SigningTypes
-import           Pact.Types.Command
-import           Pact.Types.SigData
+import           Pact.Core.Command.SigData
+import           Pact.Core.Command.Types
 import           System.Exit
 import           System.FilePath
 import           System.IO

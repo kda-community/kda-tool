@@ -97,9 +97,11 @@ fromKeyIndex = fromIntegral . naturalToInteger . unKeyIndex
 phraseToSeed :: MnemonicPhrase -> Crypto.Seed
 phraseToSeed (MnemonicPhrase lst) =
   let phraseMap = wordsToPhraseMap lst
-      Right phrase = Crypto.mnemonicPhrase @12 $ textTo <$> Map.elems phraseMap
-      Right sentence = Crypto.mnemonicPhraseToMnemonicSentence Crypto.english phrase
+      phrase = catchMnemonicError $ Crypto.mnemonicPhrase @12 $ textTo <$> Map.elems phraseMap
+      sentence = catchMnemonicError $ Crypto.mnemonicPhraseToMnemonicSentence Crypto.english phrase
   in sentenceToSeed sentence
+  where
+    catchMnemonicError = either (error "Invalid Mnemonic") id
 
 phraseToEitherSeed :: MnemonicPhrase -> Either String Crypto.Seed
 phraseToEitherSeed (MnemonicPhrase lst) = do
@@ -224,7 +226,9 @@ verify :: PublicKey -> Signature -> ByteString -> Bool
 verify (PublicKey pub) (Signature sig) msg = Crypto.verify xpub msg sig
   where
     dummyChainCode = BS.replicate 32 minBound
-    Right xpub = Crypto.xpub $ pub <> dummyChainCode
+    xpub = case Crypto.xpub $ pub <> dummyChainCode of
+              Right x -> x
+              Left _ -> error "Invalid Public key"
 
 baToText :: ByteArrayAccess b => b -> Text
 baToText = T.decodeUtf8 . BA.pack . BA.unpack

@@ -21,15 +21,15 @@ import           Data.Text.Encoding
 import qualified Data.Vector as V
 import qualified Data.YAML.Aeson as YA
 import           Kadena.SigningTypes
+import qualified Network.TLS as TLS
 import           Network.Connection
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Status
---import           Pact.ApiReq
-import qualified Pact.ApiReq as Pact
 import qualified Pact.JSON.Encode as J
-import           Pact.Types.Command
-import           Pact.Types.SigData
+import           Pact.Core.Command.SigData
+import           Pact.Core.Command.Types
+import           Pact.Core.Command.Client
 import           System.IO
 import           Text.Printf
 ------------------------------------------------------------------------------
@@ -50,11 +50,11 @@ genTxCommand e args = do
 
 githubFile :: Env -> GitHubTemplate -> IO (Either String Text)
 githubFile e ght = do
-  let repos = fromMaybe (["kadena-io/txlib"]) $ (fmap (:[]) (_ght_templateRepo ght) <|> _configData_txRepos (_env_configData e))
+  let repos = fromMaybe (["kda-community/txlib"]) $ (fmap (:[]) (_ght_templateRepo ght) <|> _configData_txRepos (_env_configData e))
       tpl = _ght_templateName ght
       mkUrl repo = printf "https://raw.githubusercontent.com/%s/master/%s.ktpl" repo tpl
       go repo = do
-        httpsMgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False) Nothing)
+        httpsMgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False TLS.defaultSupported) Nothing)
         req <- parseRequest (mkUrl repo)
         resp <- httpLbs req httpsMgr
         let tplContents = toS $ responseBody resp
@@ -97,8 +97,8 @@ genFromContents op tplContents useOldOutput = do
                               M.union (M.filter (/= Null) vars) rest
         txts <- hoistEither $ first prettyFailure $ fillValueVars tpl augmentedVars
         txis :: [TxInputs] <- sequence $ map (hoistEither . parseTxInputs) txts
-        apiReqs :: [Pact.ApiReq] <- mapM (lift . txInputsToApiReq) txis
-        cmds :: [Command Text] <- mapM (fmap snd . lift . Pact.mkApiReqCmd True "") apiReqs
+        apiReqs :: [ApiReq] <- mapM (lift . txInputsToApiReq) txis
+        cmds :: [Command Text] <- mapM (fmap snd . lift . mkApiReqCmd True "") apiReqs
         let chooseFormat i =
               if useOldOutput
                 then pure $ encodeText $ J.toJsonViaEncode i

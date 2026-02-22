@@ -23,6 +23,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding
 import           Katip
 import           Network.Connection
+import qualified Network.TLS as TLS
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header
@@ -106,7 +107,7 @@ queryHostPort :: LogEnv -> Scheme -> HostPort -> Text -> ExceptT String IO (Mana
 queryHostPort le s hp urlPath = ExceptT $ do
     mgr <- case s of
       Http -> newManager defaultManagerSettings
-      Https -> newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False) Nothing)
+      Https -> newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False TLS.defaultSupported) Nothing)
     let shpText = schemeHostPortToText $ SchemeHostPort (Just s) hp
         url = T.unpack $ shpText <> urlPath
     logLE le DebugS $ logStr $ "Parsing url " <> url
@@ -163,7 +164,7 @@ nodeGetCut le shp apiVer networkId = do
     mgr <- case _shp_scheme shp of
       Just Http -> newManager defaultManagerSettings
       -- Default to https for cuts if there was no explicit endpoint
-      _ -> newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False) Nothing)
+      _ -> newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False TLS.defaultSupported) Nothing)
     req0 <- parseRequest url
     let req = req0
           { method = "GET"
@@ -187,7 +188,7 @@ mempoolPending shp apiVer network c = do
           { method = "POST"
           , requestHeaders = [(hContentType, "application/json")]
           }
-    mgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False) Nothing)
+    mgr <- newTlsManagerWith (mkManagerSettings (TLSSettingsSimple True False False TLS.defaultSupported) Nothing)
     httpLbs req mgr
   where
     url = printf "%s/chainweb/%s/%s/chain/%d/mempool/getPending" (schemeHostPortToText shp) apiVer network (unChainId c)
