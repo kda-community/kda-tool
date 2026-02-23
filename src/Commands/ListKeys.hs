@@ -43,4 +43,4 @@ listKeysCommand efc mInd mDeriv= do
     (Right (HDRoot seed mpass), Just ChainWeaver) -> printChainWeaverKeys seed mpass mInd
     (Right (HDRoot seed _), Just KIP) -> printKipKeys seed mInd
     (Right (HDRoot seed mpass), Nothing) -> printChainWeaverKeys seed mpass mInd >> putStrLn "" >> printKipKeys seed mInd
-    (Right (PlainKeyPair _ pub), _) -> printPlainKey pub
+    (Right (SingleKeyPair _ pub), _) -> printPlainKey pub

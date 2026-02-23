@@ -86,7 +86,7 @@ signYamlFile kkey mindex enc msgFile = do
           signingKeys = S.fromList $ map _s_pubKey $ unSignatureList sigs
       case kkey of
         HDRoot seed mpass -> tryHdIndex msgFile csd seed mpass mindex
-        PlainKeyPair sec pub -> do
+        SingleKeyPair sec pub -> do
           let pubHex = PublicKeyHex $ pubKeyToText pub
           if S.member pubHex signingKeys
             then do
@@ -160,7 +160,7 @@ signOther msgFile kkey kind enc = do
           HDRoot seed mpass ->
             let (esec, pub) = generateCryptoPairFromRoot (seedToRoot seed mpass) mpass kind
             in (pub, sign esec mpass msg)
-          PlainKeyPair sec pub -> (pub, sign sec Nothing msg)
+          SingleKeyPair sec pub -> (pub, sign sec Nothing msg)
     lift $ T.putStrLn $ pubKeyToText pubKey <> ": " <> coerce sig
   case res of
     Left e -> die e
