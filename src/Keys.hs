@@ -116,12 +116,6 @@ newtype KeyIndex = KeyIndex { unKeyIndex :: Natural }
 fromKeyIndex :: KeyIndex -> Word32
 fromKeyIndex = fromIntegral . naturalToInteger . unKeyIndex
 
--- genMnemonic24 :: MonadIO m => m (Either Text (Crypto.MnemonicSentence 24))
--- genMnemonic24 = liftIO $ bimap tshow Crypto.entropyToWords . Crypto.toEntropy @256
---   -- This size must be a 1/8th the size of the 'toEntropy' size: 256 / 8 = 32
---   <$> Crypto.Random.Entropy.getEntropy @ByteString 32
-
--- for recovery
 phraseToSeed :: MnemonicPhrase -> Crypto.Seed
 phraseToSeed (MnemonicPhrase lst) =
   let phraseMap = wordsToPhraseMap lst
@@ -245,10 +239,9 @@ newtype ParsedSignature = ParsedSignature ByteString
 parseSignature :: Text -> Either Text ParsedSignature
 parseSignature x = do
   bs <- fromB16 x
-  case BS.length bs == 64 of
-    False -> Left "Signature must be 128 hex characters"
-    True -> pure $ ParsedSignature bs
-
+  case BS.length bs of
+    64 ->  pure $ ParsedSignature bs
+    _ -> Left "Signature must be 128 hex characters"
 
 pubKeyToText :: PublicKey -> Text
 pubKeyToText (CardanoPublicKey pk) = toB16 pk
@@ -257,12 +250,10 @@ pubKeyToText (PlainPublicKey pk) = toB16 $ BA.convert pk
 toPubKey :: Text -> Either Text PublicKey
 toPubKey txt = do
   bs <- fromB16 txt
-  case BS.length bs == 32 of
-    False -> Left "PublicKey should be 64 hex characters"
-    True -> pure $ CardanoPublicKey bs
+  case BS.length bs of
+    32 -> pure $ CardanoPublicKey bs
+    _ -> Left "PublicKey should be 64 hex characters"
 
---encryptedPrivateKeyToText :: EncryptedPrivateKey -> Text
---encryptedPrivateKeyToText (EncryptedPrivateKey xprv) = toB16 $ Crypto.unXPrv xprv
 
 sign :: SecretKey -> Maybe Text -> ByteString -> Signature
 sign (CardanoSecretKey xprv) mpass = Signature . toB16 . Crypto.unXSignature . Crypto.sign @ByteString (T.encodeUtf8 (fromMaybe "" mpass)) xprv
