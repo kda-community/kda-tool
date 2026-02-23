@@ -68,7 +68,7 @@ appMain version = do
       CombineSigs files -> combineSigsCommand theEnv files
       GenTx args -> genTxCommand theEnv args
       Keygen keyType -> keygenCommand keyType
-      ListKeys kf ind -> listKeysCommand kf ind
+      ListKeys kf ind deriv -> listKeysCommand kf ind deriv
       Local args -> localCommand theEnv args
       Mempool hp cid ma mn -> mempoolCommand hp ma mn cid
       Poll args -> pollCommand theEnv args

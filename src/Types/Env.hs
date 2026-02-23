@@ -239,9 +239,9 @@ signP = SignArgs
 data VerifyArgs = VerifyArgs
   { _verifyArgs_msgFile :: FilePath
   , _verifyArgs_pubKey :: PublicKey
-  , _verifyArgs_sig :: Signature
+  , _verifyArgs_sig :: ParsedSignature
   , _verifyArgs_encoding :: Maybe Encoding
-  } deriving (Eq,Ord,Show)
+  } deriving (Eq, Show)
 
 verifyP :: Parser VerifyArgs
 verifyP = VerifyArgs
@@ -258,14 +258,13 @@ pubKeyP = argument pubKeyReader $ mconcat
   where
     pubKeyReader = eitherReader (fmapL T.unpack . toPubKey . T.pack)
 
-signatureP :: Parser Signature
+signatureP :: Parser ParsedSignature
 signatureP = argument signatureReader $ mconcat
   [ metavar "SIGNATURE"
   , help "Signature (in hex)"
   ]
   where
-    signatureReader = eitherReader
-      ((either (Left . T.unpack) toSignature) . fromB16 . T.pack)
+    signatureReader = eitherReader (fmapL T.unpack . parseSignature . T.pack)
 
 msgFileP :: Parser FilePath
 msgFileP = strOption $ mconcat
@@ -452,7 +451,7 @@ data SubCommand
   | Cut SchemeHostPort (Maybe Text) (Maybe Text)
   | GenTx GenTxArgs
   | Keygen KeyType
-  | ListKeys (Either FilePath ChainweaverFile) (Maybe KeyIndex)
+  | ListKeys (Either FilePath ChainweaverFile) (Maybe KeyIndex) (Maybe DerivationType)
   | Local LocalCmdArgs
   | Mempool SchemeHostPort ChainId (Maybe Text) (Maybe Text)
   | Poll NodeTxCmdArgs
@@ -460,7 +459,7 @@ data SubCommand
   | Sign SignArgs
   | Verify VerifyArgs
   | WalletSign WalletSignArgs
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Show)
 
 data Args = Args
   { _args_command :: SubCommand
@@ -519,8 +518,19 @@ keyTypeP = argument (eitherReader (keyTypeFromText . T.pack)) $ mconcat
   where
     rdr = T.unpack . keyTypeToText
 
+derivTypeP :: Parser DerivationType
+derivTypeP = option (eitherReader (derivTypeFromText . T.pack)) $ mconcat
+  [ metavar "DERIV_TYPE"
+  , long "deriv"
+  , short 'd'
+  , help "Derivation type (ChainWeaver or KIP)"
+  , completeWith (map rdr [minBound..maxBound])
+  ]
+  where
+    rdr = T.unpack . derivTypeToText
+
 listKeysP :: Parser SubCommand
-listKeysP = ListKeys <$> keyFileOrChainweaverP <*> optional indP
+listKeysP = ListKeys <$> keyFileOrChainweaverP <*> optional indP <*> optional derivTypeP
   where
     keyIndexReader = maybeReader (fmap KeyIndex . readNatural)
     indP = option keyIndexReader $ mconcat

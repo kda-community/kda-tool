@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Keys where
 
@@ -16,14 +17,18 @@ import qualified Crypto.Encoding.BIP39 as Crypto
 import qualified Crypto.Encoding.BIP39.English as Crypto
 import           Crypto.Error
 import qualified Crypto.PubKey.Ed25519 as ED25519
+import           Crypto.MAC.HMAC
+import           Crypto.Hash
 import qualified Crypto.Random.Entropy
 import           Data.Aeson
 import           Data.Bifunctor
+import           Data.Binary.Put
 import           Data.Bits ((.|.))
 import           Data.ByteArray (ByteArrayAccess)
 import qualified Data.ByteArray as BA
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import           Data.Either (fromRight)
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Map as Map
@@ -51,11 +56,32 @@ genMnemonic12 = liftIO $ bimap tshow Crypto.entropyToWords . Crypto.toEntropy @1
   -- This size must be a 1/8th the size of the 'toEntropy' size: 128 / 8 = 16
   <$> Crypto.Random.Entropy.getEntropy @ByteString 16
 
-generateCryptoPairFromRoot :: Crypto.XPrv -> Maybe Text -> KeyIndex -> (EncryptedPrivateKey, PublicKey)
+-- KIP-0026 / SLIP-10 derivation
+kipDerivSecretKey :: ByteString -> KeyIndex -> ED25519.SecretKey
+kipDerivSecretKey seed ki = onCryptoFailure (error . show) id $ ED25519.secretKey pkey3
+  where
+    (pkey3, _)     = doDeriv pkey2 code2 (fromKeyIndex ki)
+    (pkey2, code2) = doDeriv pkey1 code1 626
+    (pkey1, code1) = doDeriv pkey0 code0 44
+    (pkey0, code0) = doHmac "ed25519 seed" seed
+
+    doDeriv:: ByteString -> ByteString -> Word32 -> (ByteString, ByteString)
+    doDeriv pkey code idx = doHmac code $ LBS.toStrict $  runPut $ putWord8 0 >> putByteString pkey >> putWord32be (0x80000000 .|. idx)
+
+    doHmac :: ByteArrayAccess ba => ByteString -> ba -> (ByteString, ByteString)
+    doHmac key dta = BS.splitAt 32 $ BA.convert $ (hmac key dta :: HMAC SHA512)
+
+
+generateKipCryptoPairFromSeed :: ByteString -> KeyIndex -> (SecretKey, PublicKey)
+generateKipCryptoPairFromSeed seed ki = let skey = kipDerivSecretKey seed ki
+                                        in (PlainSecretKey skey , PlainPublicKey $ ED25519.toPublic skey)
+
+
+generateCryptoPairFromRoot :: Crypto.XPrv -> Maybe Text -> KeyIndex -> (SecretKey, PublicKey)
 generateCryptoPairFromRoot root pass i =
   let hardenedIdx = 0x80000000 .|. (fromKeyIndex i)
       xprv = Crypto.deriveXPrv scheme (T.encodeUtf8 $ fromMaybe "" pass) root hardenedIdx
-  in (EncryptedPrivateKey xprv, PublicKey $ Crypto.xpubPublicKey $ Crypto.toXPub xprv)
+  in (CardanoSecretKey xprv, CardanoPublicKey $ Crypto.xpubPublicKey $ Crypto.toXPub xprv)
   where
     scheme = Crypto.DerivationScheme2
 
@@ -74,6 +100,7 @@ newtype MnemonicPhrase = MnemonicPhrase [ Text ]
 mkMnemonicPhrase :: [Text] -> Maybe MnemonicPhrase
 mkMnemonicPhrase lst
   | length lst == 12 = Just $ MnemonicPhrase lst
+  | length lst == 24 = Just $ MnemonicPhrase lst
   | otherwise = Nothing
 
 readPhraseFromFile :: FilePath -> IO (Maybe MnemonicPhrase)
@@ -105,11 +132,21 @@ phraseToSeed (MnemonicPhrase lst) =
     catchMnemonicError = either (error "Invalid Mnemonic") id
 
 phraseToEitherSeed :: MnemonicPhrase -> Either String Crypto.Seed
-phraseToEitherSeed (MnemonicPhrase lst) = do
-  let phraseMap = wordsToPhraseMap lst
-  phrase <- first show $ Crypto.mnemonicPhrase @12 $ textTo <$> Map.elems phraseMap
-  sentence <- first show $ Crypto.mnemonicPhraseToMnemonicSentence Crypto.english phrase
-  pure $ sentenceToSeed sentence
+phraseToEitherSeed (MnemonicPhrase lst) =
+  case length lst of
+    12 -> do
+        phrase <- first show $ Crypto.mnemonicPhrase @12 phraseWords
+        sentence <- first show $ Crypto.mnemonicPhraseToMnemonicSentence Crypto.english phrase
+        pure $ sentenceToSeed sentence
+    24 -> do
+        phrase <- first show $ Crypto.mnemonicPhrase @24 phraseWords
+        sentence <- first show $ Crypto.mnemonicPhraseToMnemonicSentence Crypto.english phrase
+        pure $ sentenceToSeed sentence
+
+    _ -> Left "Unknown Mnemonic Length"
+
+  where
+    phraseWords = textTo <$> (Map.elems $ wordsToPhraseMap lst)
 
 -- for generation
 sentenceToSeed :: Crypto.ValidMnemonicSentence mw => Crypto.MnemonicSentence mw -> Crypto.Seed
@@ -130,7 +167,7 @@ wordsToPhraseMap = Map.fromList . zip [WordKey 1 ..]
 
 data KadenaKey
   = HDRoot ByteString (Maybe Text) --Seed + Maybe Chaibnweaver password
-  | PlainKeyPair ED25519.SecretKey ED25519.PublicKey
+  | PlainKeyPair SecretKey PublicKey
 
 data KeyPairYaml = KeyPairYaml
   { kpyPublic :: Text
@@ -157,7 +194,7 @@ readKadenaKey h = do
         let mres = do
               pub <- maybeCryptoError . ED25519.publicKey =<< hush (fromB16 $ kpyPublic kpy)
               sec <- maybeCryptoError . ED25519.secretKey =<< hush (fromB16 $ kpySecret kpy)
-              pure $ PlainKeyPair sec pub
+              pure $ PlainKeyPair (PlainSecretKey sec) (PlainPublicKey pub)
         pure $ note "not a valid ED25519 key pair" mres
     Right _ -> pure $ Left "Invalid JSON type for key material"
     Left _ -> pure $ Left "Could not parse key material"
@@ -186,54 +223,59 @@ decodeEncryptedMnemonic t =
   where
     seed = (fromRight BS.empty . B16.decodeBase16Untyped . T.encodeUtf8) t
 
-genPairFromPhrase :: MnemonicPhrase -> KeyIndex -> (EncryptedPrivateKey, PublicKey)
+genPairFromPhrase :: MnemonicPhrase -> KeyIndex -> (SecretKey, PublicKey)
 genPairFromPhrase phrase idx =
   generateCryptoPairFromRoot (mnemonicToRoot phrase) Nothing idx
 
-newtype PublicKey = PublicKey ByteString
+
+data SecretKey = CardanoSecretKey Crypto.XPrv
+               | PlainSecretKey ED25519.SecretKey
+
+data PublicKey = CardanoPublicKey ByteString
+               | PlainPublicKey ED25519.PublicKey
+  deriving (Eq, Show)
+
+
+newtype Signature = Signature Text
   deriving (Eq, Ord, Show)
 
-newtype EncryptedPrivateKey =
-  EncryptedPrivateKey { unEncryptePrivateKey :: Crypto.XPrv }
-
-newtype Signature = Signature Crypto.XSignature
+newtype ParsedSignature = ParsedSignature ByteString
   deriving (Eq, Ord, Show)
 
-sigToText :: Signature -> Text
-sigToText (Signature sig) = toB16 $ Crypto.unXSignature sig
+parseSignature :: Text -> Either Text ParsedSignature
+parseSignature x = do
+  bs <- fromB16 x
+  case BS.length bs == 64 of
+    False -> Left "Signature must be 128 hex characters"
+    True -> pure $ ParsedSignature bs
 
-toSignature :: ByteString -> Either String Signature
-toSignature = fmap Signature . Crypto.xsignature
 
 pubKeyToText :: PublicKey -> Text
-pubKeyToText (PublicKey pub) = toB16 pub
+pubKeyToText (CardanoPublicKey pk) = toB16 pk
+pubKeyToText (PlainPublicKey pk) = toB16 $ BA.convert pk
 
---TODO -- YUCK
 toPubKey :: Text -> Either Text PublicKey
 toPubKey txt = do
   bs <- fromB16 txt
-  case BS.length bs /= 64 of
+  case BS.length bs == 32 of
     False -> Left "PublicKey should be 64 hex characters"
-    True -> pure $ PublicKey bs
+    True -> pure $ CardanoPublicKey bs
 
-encryptedPrivateKeyToText :: EncryptedPrivateKey -> Text
-encryptedPrivateKeyToText (EncryptedPrivateKey xprv) = toB16 $ Crypto.unXPrv xprv
+--encryptedPrivateKeyToText :: EncryptedPrivateKey -> Text
+--encryptedPrivateKeyToText (EncryptedPrivateKey xprv) = toB16 $ Crypto.unXPrv xprv
 
-sign :: ED25519.SecretKey -> ByteString -> ED25519.Signature
-sign secret msg =
-  ED25519.sign secret (ED25519.toPublic secret) msg
+sign :: SecretKey -> Maybe Text -> ByteString -> Signature
+sign (CardanoSecretKey xprv) mpass = Signature . toB16 . Crypto.unXSignature . Crypto.sign @ByteString (T.encodeUtf8 (fromMaybe "" mpass)) xprv
+sign (PlainSecretKey xprv) _ = Signature . toB16 . BA.convert . ED25519.sign xprv (ED25519.toPublic xprv)
 
-signHD :: EncryptedPrivateKey -> Text -> ByteString -> Signature
-signHD (EncryptedPrivateKey xprv) pass msg =
-  Signature $ Crypto.sign @ByteString (T.encodeUtf8 pass) xprv msg
-
-verify :: PublicKey -> Signature -> ByteString -> Bool
-verify (PublicKey pub) (Signature sig) msg = Crypto.verify xpub msg sig
+verify :: PublicKey -> ParsedSignature -> ByteString -> Bool
+verify (CardanoPublicKey pub) (ParsedSignature sig) msg = Crypto.verify xpub msg $ either (error . show) id $ Crypto.xsignature sig
   where
     dummyChainCode = BS.replicate 32 minBound
     xpub = case Crypto.xpub $ pub <> dummyChainCode of
               Right x -> x
               Left _ -> error "Invalid Public key"
+verify (PlainPublicKey _ ) _ _ = error "Unsupported"
 
 baToText :: ByteArrayAccess b => b -> Text
 baToText = T.decodeUtf8 . BA.pack . BA.unpack
