@@ -17,20 +17,18 @@ import           Data.Function
 import           Data.List
 import qualified Data.List.NonEmpty as NE
 import           Data.Ord
-import           Data.String.Conv
-import qualified Data.Text.IO as T
 import           Katip
-import           System.Exit
 import           Text.Printf
 ------------------------------------------------------------------------------
 import           Types.Env
 import           Types.HostPort
 import           Types.Node
 import           Utils
+import           Output
 ------------------------------------------------------------------------------
 
-pollCommand :: Env -> NodeTxCmdArgs -> IO ()
-pollCommand e args = do
+pollCommand :: Env -> PollCmdArgs -> IO ()
+pollCommand e (PollCmdArgs args shortOutput) = do
   let le = _env_logEnv e
   case _nodeTxCmdArgs_files args of
     [] -> putStrLn "No tx files specified"
@@ -48,7 +46,4 @@ pollCommand e args = do
               (schemeHostPortToText shp) (length txs) (length groups)
           responses <- lift $ mapM (\ts -> pollNode le n (txChain $ NE.head ts) (_transaction_hash <$> ts)) groups
           pure $ fromText (schemeHostPortToText shp) .= map responseToValue responses
-      case res of
-        Left er -> putStrLn er >> exitFailure
-        Right results -> T.putStrLn $ toS $ encode $ Object $ mconcat results
-
+      outputEitherResults shortOutput res

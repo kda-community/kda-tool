@@ -295,6 +295,11 @@ data LocalCmdArgs = LocalCmdArgs
   , _localTxCmdArgs_shortOutput :: Bool
   } deriving (Eq,Ord,Show,Read)
 
+data PollCmdArgs = PollCmdArgs
+  { _pollTxCmdArgs_txArgs :: NodeTxCmdArgs
+  , _pollTxCmdArgs_shortOutput :: Bool
+  } deriving (Eq,Ord,Show,Read)
+
 nodeOptP :: Parser HostPort
 nodeOptP = option (eitherReader (hostPortFromText . T.pack)) $ mconcat
   [ long "node"
@@ -328,6 +333,9 @@ nodeTxCmdP = NodeTxCmdArgs <$> many txFileP <*> optional schemeHostPortOptP
 
 localCmdP :: Parser LocalCmdArgs
 localCmdP = LocalCmdArgs <$> nodeTxCmdP <*> noVerifySigsP <*> shortOutputP
+
+pollCmdP :: Parser PollCmdArgs
+pollCmdP = PollCmdArgs <$> nodeTxCmdP <*> shortOutputP
 
 noVerifySigsP :: Parser Bool
 noVerifySigsP = flag True False $ mconcat
@@ -455,7 +463,7 @@ data SubCommand
   | ListKeys (Either FilePath ChainweaverFile) (Maybe KeyIndex)
   | Local LocalCmdArgs
   | Mempool SchemeHostPort ChainId (Maybe Text) (Maybe Text)
-  | Poll NodeTxCmdArgs
+  | Poll PollCmdArgs
   | Send NodeTxCmdArgs
   | Sign SignArgs
   | Verify VerifyArgs
@@ -576,7 +584,7 @@ nodeCommands :: Mod CommandFields SubCommand
 nodeCommands = mconcat
   [ command "local" (info (Local <$> localCmdP)
       (progDesc "Test commands locally with a node's /local endpoint"))
-  , command "poll" (info (Poll <$> nodeTxCmdP)
+  , command "poll" (info (Poll <$> pollCmdP)
       (progDesc "Poll command results with a node's /poll endpoint"))
   , command "send" (info (Send <$> nodeTxCmdP)
       (progDesc "Send commands to a node's /send endpoint"))

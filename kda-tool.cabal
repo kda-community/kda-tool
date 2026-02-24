@@ -41,6 +41,7 @@ library
     Types.Node
     Types.TxInputs
     Utils
+    Output
 
   build-depends:
       Decimal
@@ -198,3 +199,4 @@ test-suite kda-tool-tests
     Types.KeyType
     Types.TxInputs
     Utils
+    Output
