@@ -22,8 +22,8 @@ outputResults shortOutput results = do
   if shortOutput
     then putStrLn $ toS $ encode status
     else putStrLn $ toS $ encode out
-  --when (any (/="success") status) $
-  --  exitWith (ExitFailure 2)
+  when (any (/="success") status) $
+    exitWith (ExitFailure 2)
 
 outputEitherResults:: Bool -> Either String [Object] -> IO ()
 outputEitherResults shortOutput eRes =
