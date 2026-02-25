@@ -184,15 +184,23 @@ use your own config file stored somewhere else. Here is an example config file:
     "blockchaindev/my-marmalade-templates",
     "blockchaindev/txlib",
     "my-favorite-dex/txlib",
-    "kadena-io/txlib"
-  ]
+    "kda-community/txlib"
+  ],
+  "networks": {
+    "testnet04":"https://testnet.kadena.fun:1848",
+    "mainnet01":"https://api.chainweb-community.org"
+  }
 }
+
 ```
 
 Each repo is tried in the order they appear in the config file, stopping after
 the first one that works. This allows projects building on Kadena to publish
 libraries of transation templates for working with their smart contracts and for
 users to use any combination of template sets that they desire.
+
+Additionnally the config file allows you to setup network endpoints. Avoiding the need to sepcify it with thee `-n` flag for
+each `local`, `send` or `poll` command.
 
 ## Transaction Signing
 
