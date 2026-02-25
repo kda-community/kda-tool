@@ -2,7 +2,7 @@
 
 A command line tool for automating all-things Kadena.
 
-![Example Animation](https://s1.gifyu.com/images/kda-tool-demo3.gif)
+https://github.com/kda-community/kda-tool/releases
 
 ## Features
 
