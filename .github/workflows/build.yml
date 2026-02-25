@@ -27,6 +27,12 @@ jobs:
       with:
           ref: ${{ inputs.commit_sha || github.sha }}
 
+    - name: Extract version from cabal file
+      run: |
+        VERSION=$(grep -E '^version:' kda-tool.cabal | awk '{print $2}')
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+
     # Haskell Setup
     - name: Set permissions for .ghcup (ubuntu)
       if: startsWith(matrix.os, 'ubuntu-')
@@ -106,7 +112,7 @@ jobs:
 
     - name: Restore Cabal store
       id: restore-cabal
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ~/.cabal/store
         key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-key.outputs.freeze-hash }}
@@ -120,7 +126,7 @@ jobs:
 
     - name: Cache Cabal store if necessary
       if: steps.restore-cabal.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ~/.cabal/store
         key: cabal-${{ matrix.os }}-${{ matrix.ghc }}-${{ steps.cache-key.outputs.freeze-hash }}
@@ -131,5 +137,64 @@ jobs:
 
     - name: Verify Binary Linking
       shell: bash
-      if: "!contains(matrix.flags, '-build-tool')"
-      run: cabal run exe:kda -- --version
+      run: cabal run exe:kda -- --help
+
+    - name: Extract version and set up variables
+      shell: bash
+      run: |
+        VERSION=$(cabal run exe:kda -- --version)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "ARCHIVE_DIR=kda-tool-$VERSION" >> $GITHUB_ENV
+        echo "ARCHIVE_NAME=kda-tool-$VERSION-${{matrix.os}}" >> $GITHUB_ENV
+
+    - name: Prepare release artifact
+      shell: bash
+      run: |
+        OUTPUT_DIR=artifacts/$ARCHIVE_DIR
+        mkdir -p $OUTPUT_DIR
+        cp $(cabal list-bin kda) $OUTPUT_DIR
+        cp CHANGELOG.md $OUTPUT_DIR
+        cp README.md $OUTPUT_DIR
+        cp LICENSE $OUTPUT_DIR
+
+    - name: Strip binary
+      shell: bash
+      run: strip artifacts/$ARCHIVE_DIR/kda
+
+    - name: Build release archive
+      shell: bash
+      run: |
+        cd artifacts
+        tar czf $ARCHIVE_NAME.tar.gz $ARCHIVE_DIR
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v6
+      with:
+        name: release-arch-${{matrix.os}}
+        retention-days: 1
+        path: artifacts/*.tar.gz
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download All artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+          pattern: release-arch-*
+          merge-multiple: true
+
+      - name: Compute Cheksums
+        shell: bash
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: releases
+          retention-days: 30
+          path: artifacts/*.tar.gz
