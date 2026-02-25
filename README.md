@@ -187,7 +187,8 @@ use your own config file stored somewhere else. Here is an example config file:
     "kda-community/txlib"
   ],
   "networks": {
-    "testnet04":"https://testnet.kadena.fun:1848",
+    "testnet04":"https://api.testnet.chainweb.com",
+    "testnet06":"https://api.testnet.chainweb-community.org",
     "mainnet01":"https://api.chainweb-community.org"
   }
 }
