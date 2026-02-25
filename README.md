@@ -306,9 +306,11 @@ All three of these commands use the same basic format:
 kda local *.json -n mynode.example.com:<service-api-port>
 ```
 
-The `kda local` command has one additional option `--no-verify-sigs` which lets
-you test a transaction with actual blockchain data before it has been fully
-signed. You can use this with `.yaml` files straight from `kda gen`.
+The `kda local` command has two additional options
+- `--no-verify-sigs` which lets you test a transaction with actual blockchain data before it has been fully signed. You can use this with `.yaml` files straight from `kda gen`.
+
+- `--preflight` which lets you test using a preflight context. In this context, the node does more verification (Gas payment, ...), simulating a real block inclusion.
+
 
 # Using kda-tool for smart contract development
 
