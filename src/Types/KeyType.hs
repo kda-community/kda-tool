@@ -18,3 +18,15 @@ keyTypeFromText :: Text -> Either String KeyType
 keyTypeFromText "plain" = Right Plain
 keyTypeFromText "hd" = Right HD
 keyTypeFromText t = Left ("Invalid KeyType: " <> T.unpack t)
+
+data DerivationType = ChainWeaver | KIP
+  deriving (Eq,Ord,Show,Read,Enum,Bounded)
+
+derivTypeToText :: DerivationType -> Text
+derivTypeToText ChainWeaver = "chainweaver"
+derivTypeToText KIP = "kip"
+
+derivTypeFromText :: Text -> Either String DerivationType
+derivTypeFromText "chainweaver" = Right ChainWeaver
+derivTypeFromText "kip" = Right KIP
+derivTypeFromText t = Left ("Invalid derivType: " <> T.unpack t)

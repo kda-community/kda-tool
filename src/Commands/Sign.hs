@@ -6,7 +6,6 @@ module Commands.Sign
   ) where
 
 ------------------------------------------------------------------------------
-import qualified Cardano.Crypto.Wallet as Crypto
 import           Control.Error
 import qualified Crypto.Hash as Crypto
 import           Control.Monad.Except
@@ -19,6 +18,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text.IO as T
 import           Data.Text.Encoding
+import           Data.Coerce (coerce)
 import qualified Data.YAML.Aeson as YA
 import           Kadena.SigningTypes
 import           Pact.Core.Command.SigData
@@ -85,12 +85,12 @@ signYamlFile kkey mindex enc msgFile = do
           cmd = _csd_cmd csd
           signingKeys = S.fromList $ map _s_pubKey $ unSignatureList sigs
       case kkey of
-        HDRoot xprv mpass -> tryHdIndex msgFile csd xprv mpass mindex
-        PlainKeyPair sec pub -> do
-          let pubHex = PublicKeyHex $ toB16 $ BA.convert pub
+        HDRoot seed mpass -> tryHdIndex msgFile csd seed mpass mindex
+        SingleKeyPair sec pub -> do
+          let pubHex = PublicKeyHex $ pubKeyToText pub
           if S.member pubHex signingKeys
             then do
-              let sig = ED25519Sig $ toB16 $ BA.convert $ sign sec (calcHash $ encodeUtf8 cmd)
+              let sig = ED25519Sig $ coerce $ sign sec Nothing (calcHash $ encodeUtf8 cmd)
               hClose mh
               let newSigs = addSig pubHex sig sigs
               let csd2 = CommandSigData newSigs cmd
@@ -101,17 +101,17 @@ signYamlFile kkey mindex enc msgFile = do
 tryHdIndex
   :: FilePath
   -> CommandSigData
-  -> Crypto.XPrv
+  -> ByteString
   -> Maybe Text
   -> Maybe KeyIndex
   -> IO (Maybe (FilePath, Int))
-tryHdIndex msgFile csd xprv mpass mind = do
+tryHdIndex msgFile csd seed mpass mind = do
   let startingSigs = _csd_sigs csd
       cmd = _csd_cmd csd
       cmdBS = encodeUtf8 cmd
       signingKeys = S.fromList $ map _s_pubKey $ unSignatureList startingSigs
-      signPairs = getSigningInds signingKeys xprv mpass (maybe [0..100] (:[]) mind)
-      f (esec, pub) = addSig pub (ED25519Sig $ sigToText $ signHD esec (fromMaybe "" mpass) (calcHash cmdBS))
+      signPairs = getSigningInds signingKeys seed mpass (maybe [0..100] (:[]) mind)
+      f (esec, pub) = addSig pub (ED25519Sig $ coerce $ sign esec mpass (calcHash cmdBS))
       newSigs = foldr f startingSigs signPairs
   let csd2 = CommandSigData newSigs cmd
       num1 = countSigs csd
@@ -127,14 +127,16 @@ calcHash = BA.convert . Crypto.hashWith Crypto.Blake2b_256
 
 getSigningInds
   :: Set PublicKeyHex
-  -> Crypto.XPrv
+  -> ByteString
   -> Maybe Text
   -> [KeyIndex]
-  -> [(EncryptedPrivateKey, PublicKeyHex)]
-getSigningInds signingKeys xprv mpass inds = filter inSigningKeys pairs
+  -> [(SecretKey, PublicKeyHex)]
+getSigningInds signingKeys seed mpass inds = filter inSigningKeys pairs
   where
-    pairs = map (mkPair . generateCryptoPairFromRoot xprv (fromMaybe "" mpass)) inds
+    pairs = map (mkPair . generateCryptoPairFromRoot xprv mpass) inds
+            ++ map (mkPair . generateKipCryptoPairFromSeed seed) inds
     mkPair (esec, pub) = (esec, PublicKeyHex $ pubKeyToText pub)
+    xprv = seedToRoot seed mpass
     inSigningKeys pair = S.member (snd pair) signingKeys
 
 addSig :: PublicKeyHex -> UserSig -> SignatureList -> SignatureList
@@ -155,11 +157,11 @@ signOther msgFile kkey kind enc = do
     msg <- fmapLT mkParseErr $
       hoistEither $ genericDecode enc rawbs
     let (pubKey, sig) = case kkey of
-          HDRoot xprv mpass ->
-            let (esec, pub) = generateCryptoPairFromRoot xprv (fromMaybe "" mpass) kind
-            in (pub, sigToText $ signHD esec (fromMaybe "" mpass) msg)
-          PlainKeyPair sec pub -> (PublicKey $ BA.convert pub, toB16 $ BA.convert $ sign sec msg)
-    lift $ T.putStrLn $ pubKeyToText pubKey <> ": " <> sig
+          HDRoot seed mpass ->
+            let (esec, pub) = generateCryptoPairFromRoot (seedToRoot seed mpass) mpass kind
+            in (pub, sign esec mpass msg)
+          SingleKeyPair sec pub -> (pub, sign sec Nothing msg)
+    lift $ T.putStrLn $ pubKeyToText pubKey <> ": " <> coerce sig
   case res of
     Left e -> die e
     Right _ -> pure ()

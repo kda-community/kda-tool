@@ -382,8 +382,8 @@ secret: badbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbade
 
 #### HD Key Format
 
-The second format is a 12-word recovery phrase compatible with Chainweaver HD
-key generation. This format consists of all 12 words on a single line, each word
+The second format is a 12-word recovery phrase compatible with Chainweaver HD, and KIP-0026 (Loom, Linx, or Koala)
+key generation. This format consists of all 12 or 24 words on a single line, each word
 separated by a single space.
 
 ```
