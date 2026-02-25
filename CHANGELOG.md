@@ -2,7 +2,7 @@
 
 ## 1.2
 
-First community versuib
+First community version
 
 ### Improvements
 
