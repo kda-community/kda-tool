@@ -41,6 +41,7 @@ library
     Types.Node
     Types.TxInputs
     Utils
+    CryptoUtils
     Output
 
   build-depends:
