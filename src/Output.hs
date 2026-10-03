@@ -4,6 +4,7 @@ module Output
   (
     outputResults
   , outputEitherResults
+  , outputEitherStringResults
   ) where
 
 ------------------------------------------------------------------------------
@@ -30,3 +31,9 @@ outputEitherResults shortOutput eRes =
   case eRes of
     Left er -> putStrLn er >> exitFailure
     Right results -> outputResults shortOutput results
+
+outputEitherStringResults:: Either String [String] -> IO ()
+outputEitherStringResults eRes =
+  case eRes of
+    Left er -> putStrLn er >> exitFailure
+    Right results -> putStrLn $ unlines results
