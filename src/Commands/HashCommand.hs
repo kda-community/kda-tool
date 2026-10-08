@@ -11,6 +11,10 @@ import           Data.Bifunctor
 import           System.FilePath
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.Encoding as LT
+import qualified Data.Map as M
+import qualified Data.Aeson as A
 import           Katip
 ------------------------------------------------------------------------------
 import           Types.Env
@@ -26,9 +30,11 @@ hashCommand e args = do
     fs -> do
       logEnv e DebugS $ logStr $ "Parsing transactions from the following files:" <> (show $ _hashCmdArgs_file args)
       bss <- mapM LB.readFile fs
-      outputEitherStringResults $ first unlines $ (zipWith prependFilename fs) <$> (map extractHash) <$> parseAsJsonOrYaml False bss
+      outputEitherText $ first unlines $ combineHashes <$> (map extractHash) <$> parseAsJsonOrYaml False bss
       where
-        prependFilename | _hashCmdArgs_raw args = \_ h -> h
-                        | otherwise = \fp h -> (takeFileName fp) <> ": " <> h
+        combineHashes :: [T.Text] -> T.Text
+        combineHashes | _hashCmdArgs_raw args = T.unlines
+                      | otherwise = LT.toStrict . LT.decodeUtf8 . A.encode . M.fromList . zip fileNames
 
-        extractHash = T.unpack . hashB64U . _transaction_hash
+        fileNames = map takeFileName fs
+        extractHash = hashB64U . _transaction_hash

@@ -4,7 +4,7 @@ module Output
   (
     outputResults
   , outputEitherResults
-  , outputEitherStringResults
+  , outputEitherText
   ) where
 
 ------------------------------------------------------------------------------
@@ -14,6 +14,7 @@ import           Data.Aeson.Lens
 import           Data.String.Conv
 import           Control.Monad
 import           System.Exit
+import qualified Data.Text as T
 ------------------------------------------------------------------------------
 
 outputResults:: Bool -> [Object] -> IO ()
@@ -32,8 +33,8 @@ outputEitherResults shortOutput eRes =
     Left er -> putStrLn er >> exitFailure
     Right results -> outputResults shortOutput results
 
-outputEitherStringResults:: Either String [String] -> IO ()
-outputEitherStringResults eRes =
+outputEitherText:: Either String T.Text -> IO ()
+outputEitherText eRes =
   case eRes of
     Left er -> putStrLn er >> exitFailure
-    Right results -> putStrLn $ unlines results
+    Right results -> putStrLn $ T.unpack $ results
