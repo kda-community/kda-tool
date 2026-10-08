@@ -62,6 +62,10 @@ instance FromJSON ConfigData where
     <$> v .: "networks"
     <*> v .:? "tx-repos"
 
+instance Semigroup ConfigData where
+  (<>) x y = ConfigData (_configData_networks x <> _configData_networks y)
+                        $ nub <$> (_configData_txRepos x <> _configData_txRepos y)
+
 lookupConfiguredNetwork :: Env -> Text -> Either String SchemeHostPort
 lookupConfiguredNetwork e net = do
   m <- note "No networks configured" $ _configData_networks $ _env_configData e

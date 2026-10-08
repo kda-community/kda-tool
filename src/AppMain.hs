@@ -51,15 +51,11 @@ appMain version = do
       (show severity) (show verbosity)
     rand <- createSystemRandom
 
-    cf <- maybe (getXdgDirectory XdgConfig ("kda" </> "config.json")) pure mcf
-    logLE le DebugS $ logStr $ "Loading config from " <> cf
-    configExists <- doesFileExist cf
-    ecd <- if configExists
-             then eitherDecodeFileStrict' cf
-             else pure $ Right def
-    cd <- case ecd of
-      Left e -> error (printf "Error parsing %s\n%s" cf e)
-      Right cd -> pure cd
+    systemConfig <- loadConfig le $ Just $ "/etc"  </> "kda" </> "config.json"
+    userConfig <- loadConfig le =<< Just <$> getXdgDirectory XdgConfig ("kda" </> "config.json")
+    cmdConfig <- loadConfig le mcf
+
+    let cd = systemConfig <> userConfig <> cmdConfig
 
     logLE le DebugS $ logStr $ "Loaded config: " <> show cd
     let theEnv = Env mgr le cd rand
@@ -88,3 +84,19 @@ appMain version = do
       , ""
       , "source <(kda --bash-completion-script `which kda`)"
       ]
+
+
+    loadConfig:: LogEnv -> Maybe FilePath -> IO (ConfigData)
+    loadConfig _ Nothing = pure def
+    loadConfig le (Just cf) = do
+      configExists <- doesFileExist cf
+      ecd <- if configExists
+             then eitherDecodeFileStrict' cf <* logLoading
+             else (pure $ Right def) <* logNotFound
+      case ecd of
+        Left e -> error (printf "Error parsing %s\n%s" cf e)
+        Right cd -> pure cd
+
+      where
+        logNotFound = logLE le DebugS $ logStr $ "Config file not found " <> cf
+        logLoading = logLE le DebugS $ logStr $ "Loading config from " <> cf
