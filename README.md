@@ -170,13 +170,19 @@ kda-tool looks in the repository `kadena-io/txlib` to find the transaction
 templates, but you can specify your own transaction repository using the `-r`
 option.
 
-## Config File
+## Config Files
 
 By default the `kda gen` command looks for transaction templates in the
-`kadena-io/txlib` GitHub repo. You can configure kda-tool to use your own
-transaction repos by creating a config file. The default location for the config
-file is `$HOME/.config/kda/config.json`. You can also pass the `-c` option to
-use your own config file stored somewhere else. Here is an example config file:
+`kadena-community/txlib` GitHub repo. You can configure kda-tool to use your own
+transaction repos by creating config files.
+
+The default locations for the config files are:
+- `/etc/kda/config.json`
+- `$HOME/.config/kda/config.json`.
+
+You can also pass the `-c` option to use your own config file stored somewhere else.
+
+Here is an example config file:
 
 ```json
 {
