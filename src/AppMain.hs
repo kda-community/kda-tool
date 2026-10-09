@@ -55,7 +55,7 @@ appMain version = do
     userConfig <- loadConfig le =<< Just <$> getXdgDirectory XdgConfig ("kda" </> "config.json")
     cmdConfig <- loadConfig le mcf
 
-    let cd = systemConfig <> userConfig <> cmdConfig
+    let cd = cmdConfig <> userConfig <> systemConfig
 
     logLE le DebugS $ logStr $ "Loaded config: " <> show cd
     let theEnv = Env mgr le cd rand
