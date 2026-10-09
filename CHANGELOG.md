@@ -1,5 +1,19 @@
 # `kda-tool` Changelog
 
+## 1.3
+
+### Bug Fixes
+
+- Gives the correct hash in case of unsigned transactions
+
+
+### Improvements
+
+- Add the `hash` function which outputs the hash of one or several transactions
+- Allow to poll using YAML (unsigned transactions)
+- Add a system-wide config file (`/etc/kda/config.json`) and merge it with user config, and command line config.
+
+
 ## 1.2
 
 First community version
@@ -9,7 +23,7 @@ First community version
 - Build against Pact 5 instead of Pact 4
 - Build on GHC 9.10
 - Allow to use tge -s flags with the poll request
-- Add the --prefilght option
+- Add the --preflight option
 - Support KIP-0026 derivations (Loom / Koala / Linx) for 12/24 words mnemonics
 - Add the -d option to the list-keys function to choose the derivation
 
@@ -33,4 +47,3 @@ First community version
 ## 1.0 (2022-11-09)
 
 Initial release
-
