@@ -23,6 +23,7 @@ library
     Commands.Keygen
     Commands.ListKeys
     Commands.Local
+    Commands.HashCommand
     Commands.Mempool
     Commands.Poll
     Commands.Send
@@ -41,6 +42,7 @@ library
     Types.Node
     Types.TxInputs
     Utils
+    CryptoUtils
     Output
 
   build-depends:

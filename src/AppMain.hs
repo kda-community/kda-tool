@@ -26,6 +26,7 @@ import           Commands.CombineSigs
 import           Commands.GenTx
 import           Commands.Keygen
 import           Commands.ListKeys
+import           Commands.HashCommand
 import           Commands.Local
 import           Commands.Mempool
 import           Commands.Poll
@@ -51,15 +52,11 @@ appMain version = do
       (show severity) (show verbosity)
     rand <- createSystemRandom
 
-    cf <- maybe (getXdgDirectory XdgConfig ("kda" </> "config.json")) pure mcf
-    logLE le DebugS $ logStr $ "Loading config from " <> cf
-    configExists <- doesFileExist cf
-    ecd <- if configExists
-             then eitherDecodeFileStrict' cf
-             else pure $ Right def
-    cd <- case ecd of
-      Left e -> error (printf "Error parsing %s\n%s" cf e)
-      Right cd -> pure cd
+    systemConfig <- loadConfig le $ Just $ "/etc"  </> "kda" </> "config.json"
+    userConfig <- loadConfig le =<< Just <$> getXdgDirectory XdgConfig ("kda" </> "config.json")
+    cmdConfig <- loadConfig le mcf
+
+    let cd = cmdConfig <> userConfig <> systemConfig
 
     logLE le DebugS $ logStr $ "Loaded config: " <> show cd
     let theEnv = Env mgr le cd rand
@@ -67,6 +64,7 @@ appMain version = do
       Cut hp ma mn -> cutCommand theEnv hp ma mn
       CombineSigs files -> combineSigsCommand theEnv files
       GenTx args -> genTxCommand theEnv args
+      Hash args -> hashCommand theEnv args
       Keygen keyType -> keygenCommand keyType
       ListKeys kf ind deriv -> listKeysCommand kf ind deriv
       Local args -> localCommand theEnv args
@@ -88,3 +86,19 @@ appMain version = do
       , ""
       , "source <(kda --bash-completion-script `which kda`)"
       ]
+
+
+    loadConfig:: LogEnv -> Maybe FilePath -> IO (ConfigData)
+    loadConfig _ Nothing = pure def
+    loadConfig le (Just cf) = do
+      configExists <- doesFileExist cf
+      ecd <- if configExists
+             then eitherDecodeFileStrict' cf <* logLoading
+             else (pure $ Right def) <* logNotFound
+      case ecd of
+        Left e -> error (printf "Error parsing %s\n%s" cf e)
+        Right cd -> pure cd
+
+      where
+        logNotFound = logLE le DebugS $ logStr $ "Config file not found " <> cf
+        logLoading = logLE le DebugS $ logStr $ "Loading config from " <> cf

@@ -62,6 +62,10 @@ instance FromJSON ConfigData where
     <$> v .: "networks"
     <*> v .:? "tx-repos"
 
+instance Semigroup ConfigData where
+  (<>) x y = ConfigData (_configData_networks x <> _configData_networks y)
+                        $ nub <$> (_configData_txRepos x <> _configData_txRepos y)
+
 lookupConfiguredNetwork :: Env -> Text -> Either String SchemeHostPort
 lookupConfiguredNetwork e net = do
   m <- note "No networks configured" $ _configData_networks $ _env_configData e
@@ -300,6 +304,11 @@ data PollCmdArgs = PollCmdArgs
   , _pollTxCmdArgs_shortOutput :: Bool
   } deriving (Eq,Ord,Show,Read)
 
+data HashCmdArgs = HashCmdArgs
+  { _hashCmdArgs_file :: [FilePath]
+  ,  _hashCmdArgs_raw :: Bool
+  } deriving (Eq,Ord,Show,Read)
+
 nodeOptP :: Parser HostPort
 nodeOptP = option (eitherReader (hostPortFromText . T.pack)) $ mconcat
   [ long "node"
@@ -337,6 +346,9 @@ localCmdP = LocalCmdArgs <$> nodeTxCmdP <*> noVerifySigsP <*> preFlightP <*> sho
 pollCmdP :: Parser PollCmdArgs
 pollCmdP = PollCmdArgs <$> nodeTxCmdP <*> shortOutputP
 
+hashCmdP :: Parser HashCmdArgs
+hashCmdP = HashCmdArgs <$> many txFileP <*> rawP
+
 noVerifySigsP :: Parser Bool
 noVerifySigsP = flag True False $ mconcat
   [ long "no-verify-sigs"
@@ -354,6 +366,13 @@ shortOutputP = flag False True $ mconcat
   [ short 's'
   , long "short"
   , help "Shortened output that only shows the status"
+  ]
+
+rawP :: Parser Bool
+rawP = flag False True $ mconcat
+  [ short 'r'
+  , long "raw"
+  , help "Return raw hashes, do not prepend filename"
   ]
 
 data Holes = Holes
@@ -470,6 +489,7 @@ data SubCommand
   | Local LocalCmdArgs
   | Mempool SchemeHostPort ChainId (Maybe Text) (Maybe Text)
   | Poll PollCmdArgs
+  | Hash HashCmdArgs
   | Send NodeTxCmdArgs
   | Sign SignArgs
   | Verify VerifyArgs
@@ -572,7 +592,9 @@ templateCommands = mconcat
 
 signingCommands :: Mod CommandFields SubCommand
 signingCommands = mconcat
-  [ command "combine-sigs" (info (CombineSigs <$> many txFileP)
+  [ command "hash" (info (Hash <$> hashCmdP)
+      (progDesc "Hash transactions"))
+  , command "combine-sigs" (info (CombineSigs <$> many txFileP)
       (progDesc "Combine signatures from multiple files"))
   , command "sign" (info (Sign <$> signP)
       (progDesc "Sign transactions"))

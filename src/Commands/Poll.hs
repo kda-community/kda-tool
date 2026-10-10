@@ -36,7 +36,7 @@ pollCommand e (PollCmdArgs args shortOutput) = do
       logEnv e DebugS $ logStr $ "Parsing transactions from the following files:" <> (show $ _nodeTxCmdArgs_files args)
       bss <- mapM LB.readFile fs
       res <- runExceptT $ do
-        allTxs <- hoistEither $ first unlines $ parseAsJsonOrYaml True bss
+        allTxs <- hoistEither $ first unlines $ parseAsJsonOrYaml False bss
         shpPairs <- handleOptionalNode e allTxs $ _nodeTxCmdArgs_node args
         forM shpPairs $ \(shp, txs) -> do
           n <- ExceptT $ getNodeServiceApi le shp
