@@ -9,6 +9,7 @@ module Utils where
 import           Chainweb.Api.ChainwebMeta
 import           Chainweb.Api.PactCommand
 import           Chainweb.Api.Sig
+import qualified Chainweb.Api.Hash as API
 import           Chainweb.Api.Transaction
 import           Control.Error
 import           Control.Exception
@@ -41,6 +42,7 @@ import           Options.Applicative hiding (Parser)
 import           Pact.Core.Command.Types
 import           System.Directory
 import           System.FilePath
+import           CryptoUtils
 import Data.Vector.Internal.Check (HasCallStack)
 ------------------------------------------------------------------------------
 
@@ -139,10 +141,12 @@ parseTransactionViaSigData requireSigs bs = do
 commandSigDataToTransaction :: Bool -> CommandSigData -> Either String Transaction
 commandSigDataToTransaction requireSigs csd = do
     let cmdText = _csd_cmd csd
+        hsh = API.Hash $ calcHashFromText cmdText
+
     pc <- eitherDecodeStrict $ T.encodeUtf8 cmdText
     sigs <- note "Error: CommandSigData has missing signatures" $
       sequence $ map (addDummy . _s_userSig) $ unSignatureList $ _csd_sigs csd
-    pure $ mkTransaction pc (map userSigToSig sigs)
+    pure $ Transaction hsh (map userSigToSig sigs) pc cmdText
   where
     addDummy = maybe (if requireSigs then Nothing else Just dummySig) Just
     dummySig = ED25519Sig "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

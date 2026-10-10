@@ -7,11 +7,9 @@ module Commands.Sign
 
 ------------------------------------------------------------------------------
 import           Control.Error
-import qualified Crypto.Hash as Crypto
 import           Control.Monad.Except
 import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
-import qualified Data.ByteArray as BA
 import           Data.List
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -32,6 +30,8 @@ import           Keys
 import           Types.Encoding
 import           Types.Env
 import           Utils
+import           CryptoUtils
+
 ------------------------------------------------------------------------------
 
 signCommand :: SignArgs -> IO ()
@@ -121,9 +121,6 @@ tryHdIndex msgFile csd seed mpass mind = do
       fp <- saveCommandSigData (dropExtension msgFile) csd2
       pure $ Just (fp, countSigs csd2 - countSigs csd)
     else pure Nothing
-
-calcHash :: ByteString -> ByteString
-calcHash = BA.convert . Crypto.hashWith Crypto.Blake2b_256
 
 getSigningInds
   :: Set PublicKeyHex
