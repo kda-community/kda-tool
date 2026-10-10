@@ -26,6 +26,7 @@ import           Commands.CombineSigs
 import           Commands.GenTx
 import           Commands.Keygen
 import           Commands.ListKeys
+import           Commands.HashCommand
 import           Commands.Local
 import           Commands.Mempool
 import           Commands.Poll
@@ -63,6 +64,7 @@ appMain version = do
       Cut hp ma mn -> cutCommand theEnv hp ma mn
       CombineSigs files -> combineSigsCommand theEnv files
       GenTx args -> genTxCommand theEnv args
+      Hash args -> hashCommand theEnv args
       Keygen keyType -> keygenCommand keyType
       ListKeys kf ind deriv -> listKeysCommand kf ind deriv
       Local args -> localCommand theEnv args
